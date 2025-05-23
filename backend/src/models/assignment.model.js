@@ -11,29 +11,21 @@ const assignmentSchema = new mongoose.Schema({
     required: [true, 'Assignment title is required'],
     trim: true
   },
-  location: {
-    type: String,
-    required: [true, 'Assignment location is required'],
-    trim: true
-  },
   unit: {
     type: String,
     required: [true, 'Unit is required'],
     trim: true
+  },
+  qty: {
+    type: Number,
+    min: [1, 'Quantity must be at least 1'],
+    default: 1
   },
   status: {
     type: String,
     required: true,
     enum: ['Active', 'Completed', 'Pending', 'Cancelled'],
     default: 'Pending'
-  },
-  startDate: {
-    type: Date,
-    required: [true, 'Start date is required']
-  },
-  endDate: {
-    type: Date,
-    required: [true, 'End date is required']
   },
   assignedBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -48,14 +40,28 @@ const assignmentSchema = new mongoose.Schema({
     type: String,
     required: true
   }],
-  priority: {
-    type: String,
-    enum: ['Low', 'Medium', 'High', 'Critical'],
-    default: 'Medium'
-  },
   description: {
     type: String,
     trim: true
+  },
+  equipmentPurchase: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Purchase'
+  },
+  equipmentQuantity: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  equipment: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  equipmentType: {
+    type: String,
+    enum: ['', 'Weapons', 'Vehicles', 'Communications', 'Medical', 'Protective', 'Tools', 'Other'],
+    default: ''
   },
   attachments: [{
     type: String // URLs to attached files
@@ -76,10 +82,33 @@ assignmentSchema.pre('save', function(next) {
   next();
 });
 
-// Validate that end date is after start date
-assignmentSchema.pre('save', function(next) {
-  if (this.endDate <= this.startDate) {
-    next(new Error('End date must be after start date'));
+// Post save hook to update equipment availability
+assignmentSchema.post('save', async function(doc) {
+  if (doc.equipmentPurchase && doc.equipmentQuantity > 0) {
+    try {
+      const Purchase = require('./purchase.model');
+      await Purchase.findByIdAndUpdate(
+        doc.equipmentPurchase,
+        { $inc: { quantityAvailable: -doc.equipmentQuantity } }
+      );
+    } catch (error) {
+      console.error('Error updating equipment availability:', error);
+    }
+  }
+});
+
+// Pre remove hook to restore equipment availability when assignment is deleted
+assignmentSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
+  if (this.equipmentPurchase && this.equipmentQuantity > 0) {
+    try {
+      const Purchase = require('./purchase.model');
+      await Purchase.findByIdAndUpdate(
+        this.equipmentPurchase,
+        { $inc: { quantityAvailable: this.equipmentQuantity } }
+      );
+    } catch (error) {
+      console.error('Error restoring equipment availability:', error);
+    }
   }
   next();
 });

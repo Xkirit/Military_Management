@@ -26,6 +26,7 @@ exports.getAllAssignments = async (req, res) => {
       .populate('personnel', 'firstName lastName rank')
       .populate('assignedBy', 'firstName lastName rank')
       .populate('approvedBy', 'firstName lastName rank')
+      .populate('equipmentPurchase', 'item category quantity quantityAvailable supplier specifications')
       .sort({ startDate: 1 });
     
     res.status(200).json(assignments);
@@ -43,7 +44,8 @@ exports.getAssignmentById = async (req, res) => {
     const assignment = await Assignment.findById(req.params.id)
       .populate('personnel', 'firstName lastName rank')
       .populate('assignedBy', 'firstName lastName rank')
-      .populate('approvedBy', 'firstName lastName rank');
+      .populate('approvedBy', 'firstName lastName rank')
+      .populate('equipmentPurchase', 'item category quantity quantityAvailable supplier specifications');
     
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found' });
@@ -65,6 +67,7 @@ exports.getAssignmentsByPersonnel = async (req, res) => {
       .populate('personnel', 'firstName lastName rank')
       .populate('assignedBy', 'firstName lastName rank')
       .populate('approvedBy', 'firstName lastName rank')
+      .populate('equipmentPurchase', 'item category quantity quantityAvailable supplier specifications')
       .sort({ startDate: 1 });
     
     res.status(200).json(assignments);

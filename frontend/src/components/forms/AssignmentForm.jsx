@@ -1,50 +1,176 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
-import { assignmentService } from '../../services/api';
+import { assignmentService, userService, purchaseService } from '../../services/api';
 import './Forms.css';
 
 const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
   const { user } = useAuth();
   const isEdit = !!editData;
   
-  // Generate a sample ObjectId for testing
-  const sampleObjectId = '507f1f77bcf86cd799439011';
-  
   const [formData, setFormData] = useState({
-    personnel: editData?.personnel?._id || editData?.personnel || sampleObjectId,
+    personnel: editData?.personnel?._id || editData?.personnel || '',
     assignment: editData?.assignment || '',
-    location: editData?.location || '',
     unit: editData?.unit || '',
-    startDate: editData?.startDate?.split('T')[0] || '',
-    endDate: editData?.endDate?.split('T')[0] || '',
     duties: editData?.duties?.join('\n') || '',
-    priority: editData?.priority || 'Medium',
-    description: editData?.description || ''
+    description: editData?.description || '',
+    equipmentPurchase: editData?.equipmentPurchase?._id || editData?.equipmentPurchase || '',
+    equipmentQuantity: editData?.equipmentQuantity || 1
   });
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  
+  // Personnel search state
+  const [personnelSearch, setPersonnelSearch] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showPersonnelDropdown, setShowPersonnelDropdown] = useState(false);
+  const [selectedPersonnel, setSelectedPersonnel] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Equipment search state
+  const [equipmentSearch, setEquipmentSearch] = useState('');
+  const [availableEquipment, setAvailableEquipment] = useState([]);
+  const [showEquipmentDropdown, setShowEquipmentDropdown] = useState(false);
+  const [selectedEquipment, setSelectedEquipment] = useState(null);
+  const [equipmentLoading, setEquipmentLoading] = useState(false);
+
+  // Initialize selected personnel if editing
+  useEffect(() => {
+    if (editData?.personnel && typeof editData.personnel === 'object') {
+      setSelectedPersonnel(editData.personnel);
+      setPersonnelSearch(`${editData.personnel.firstName} ${editData.personnel.lastName} (${editData.personnel.rank})`);
+    }
+  }, [editData]);
+
+  // Initialize selected equipment if editing
+  useEffect(() => {
+    if (editData?.equipmentPurchase && typeof editData.equipmentPurchase === 'object') {
+      setSelectedEquipment(editData.equipmentPurchase);
+      setEquipmentSearch(`${editData.equipmentPurchase.item} (${editData.equipmentPurchase.category})`);
+    }
+  }, [editData]);
+
+  // Search personnel function
+  const searchPersonnel = async (searchTerm) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      const response = await userService.searchUsers({ 
+        search: searchTerm,
+        limit: 10 
+      });
+      setSearchResults(response.data);
+    } catch (error) {
+      console.error('Error searching personnel:', error);
+      toast.error('Failed to search personnel');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Search equipment function
+  const searchEquipment = async (searchTerm) => {
+    setEquipmentLoading(true);
+    try {
+      const response = await purchaseService.getAvailableEquipment({ 
+        search: searchTerm,
+        limit: 20 
+      });
+      setAvailableEquipment(response.data);
+    } catch (error) {
+      console.error('Error searching equipment:', error);
+      toast.error('Failed to search equipment: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setEquipmentLoading(false);
+    }
+  };
+
+  // Load available equipment on component mount
+  useEffect(() => {
+    searchEquipment('');
+  }, []);
+
+  // Handle personnel search input
+  const handlePersonnelSearch = (e) => {
+    const value = e.target.value;
+    setPersonnelSearch(value);
+    setShowPersonnelDropdown(true);
+    
+    // Clear selected personnel if user is typing
+    if (selectedPersonnel) {
+      setSelectedPersonnel(null);
+      setFormData(prev => ({ ...prev, personnel: '' }));
+    }
+    
+    // Debounce search
+    setTimeout(() => searchPersonnel(value), 300);
+  };
+
+  // Handle equipment search input
+  const handleEquipmentSearch = (e) => {
+    const value = e.target.value;
+    setEquipmentSearch(value);
+    setShowEquipmentDropdown(true);
+    
+    // Clear selected equipment if user is typing
+    if (selectedEquipment) {
+      setSelectedEquipment(null);
+      setFormData(prev => ({ ...prev, equipmentPurchase: '', equipmentQuantity: 1 }));
+    }
+    
+    // Debounce search
+    setTimeout(() => searchEquipment(value), 300);
+  };
+
+  // Handle personnel selection
+  const handlePersonnelSelect = (personnel) => {
+    setSelectedPersonnel(personnel);
+    setPersonnelSearch(`${personnel.firstName} ${personnel.lastName} (${personnel.rank})`);
+    setFormData(prev => ({ ...prev, personnel: personnel._id }));
+    setShowPersonnelDropdown(false);
+    setSearchResults([]);
+    
+    // Clear personnel error if it exists
+    if (errors.personnel) {
+      setErrors(prev => ({ ...prev, personnel: '' }));
+    }
+  };
+
+  // Handle equipment selection
+  const handleEquipmentSelect = (equipment) => {
+    setSelectedEquipment(equipment);
+    setEquipmentSearch(`${equipment.item} (${equipment.category})`);
+    setFormData(prev => ({ 
+      ...prev, 
+      equipmentPurchase: equipment._id,
+      equipmentQuantity: 1
+    }));
+    setShowEquipmentDropdown(false);
+    
+    // Clear equipment error if it exists
+    if (errors.equipmentQuantity) {
+      setErrors(prev => ({ ...prev, equipmentQuantity: '' }));
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.personnel) newErrors.personnel = 'Personnel ID is required';
+    if (!formData.personnel) newErrors.personnel = 'Personnel selection is required';
     if (!formData.assignment) newErrors.assignment = 'Assignment title is required';
-    if (!formData.location) newErrors.location = 'Location is required';
     if (!formData.unit) newErrors.unit = 'Unit is required';
-    if (!formData.startDate) newErrors.startDate = 'Start date is required';
-    if (!formData.endDate) newErrors.endDate = 'End date is required';
     if (!formData.duties) newErrors.duties = 'Duties are required';
-    
-    // Validate ObjectId format (24 character hex string)
-    const objectIdRegex = /^[0-9a-fA-F]{24}$/;
-    if (formData.personnel && !objectIdRegex.test(formData.personnel)) {
-      newErrors.personnel = 'Personnel ID must be a valid 24-character MongoDB ObjectId';
+    if (!formData.equipmentQuantity || formData.equipmentQuantity <= 0) {
+      newErrors.equipmentQuantity = 'Equipment quantity is required and must be at least 1';
     }
     
-    // Validate dates
-    if (formData.startDate && formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
-      newErrors.endDate = 'End date must be after start date';
+    // Validate equipment quantity if equipment is selected
+    if (selectedEquipment && formData.equipmentQuantity > selectedEquipment.quantityAvailable) {
+      newErrors.equipmentQuantity = `Only ${selectedEquipment.quantityAvailable} units available`;
     }
     
     setErrors(newErrors);
@@ -75,15 +201,18 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
       const submissionData = {
         personnel: formData.personnel,
         assignment: formData.assignment,
-        location: formData.location,
         unit: formData.unit,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
         duties: formData.duties.split('\n').filter(duty => duty.trim() !== ''),
-        priority: formData.priority,
         description: formData.description,
-        status: 'Pending'
+        status: 'Pending',
+        assignedBy: user._id,
+        equipmentQuantity: parseInt(formData.equipmentQuantity) || 1
       };
+
+      // Add equipment data if selected
+      if (formData.equipmentPurchase) {
+        submissionData.equipmentPurchase = formData.equipmentPurchase;
+      }
 
       if (isEdit) {
         await assignmentService.updateAssignment(editData._id || editData.id, submissionData);
@@ -93,8 +222,8 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
         toast.success('Assignment created successfully');
       }
 
-      onSuccess?.(); // Call success callback
-      onClose?.(); // Close the form
+      onSuccess?.();
+      onClose?.();
     } catch (error) {
       console.error('Error submitting assignment:', error);
       const errorMessage = error.response?.data?.message || 
@@ -106,57 +235,61 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
     }
   };
 
-  const generateSampleId = () => {
-    // Generate a new sample ObjectId
-    const timestamp = Math.floor(Date.now() / 1000).toString(16);
-    const randomHex = Math.random().toString(16).substr(2, 16);
-    const newId = (timestamp + randomHex).substr(0, 24);
-    setFormData(prev => ({ ...prev, personnel: newId }));
-  };
-
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
+      <div className="modal-content large">
         <div className="modal-header">
           <h2>{isEdit ? 'Edit Assignment' : 'Create New Assignment'}</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="form-container">
+          {/* Personnel Search Section */}
           <div className="form-group">
-            <label htmlFor="personnel">Personnel ID* (MongoDB ObjectId)</label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <label htmlFor="personnelSearch">Search & Select Personnel*</label>
+            <div className="personnel-search-container">
               <input
                 type="text"
-                id="personnel"
-                name="personnel"
-                value={formData.personnel}
-                onChange={handleChange}
+                id="personnelSearch"
+                value={personnelSearch}
+                onChange={handlePersonnelSearch}
+                onFocus={() => setShowPersonnelDropdown(true)}
                 className={errors.personnel ? 'error' : ''}
                 disabled={loading}
-                placeholder="24-character MongoDB ObjectId"
-                style={{ flex: 1 }}
+                placeholder="Type to search by name, email, or rank..."
               />
-              <button
-                type="button"
-                onClick={generateSampleId}
-                disabled={loading}
-                style={{
-                  padding: '0.5rem',
-                  background: '#f5f5f5',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem'
-                }}
-              >
-                Generate Sample
-              </button>
+              
+              {showPersonnelDropdown && (searchResults.length > 0 || searchLoading) && (
+                <div className="personnel-dropdown">
+                  {searchLoading ? (
+                    <div className="personnel-option loading">Searching...</div>
+                  ) : (
+                    searchResults.map((person) => (
+                      <div
+                        key={person._id}
+                        className="personnel-option"
+                        onClick={() => handlePersonnelSelect(person)}
+                      >
+                        <div className="personnel-name">
+                          {person.firstName} {person.lastName}
+                        </div>
+                        <div className="personnel-details">
+                          {person.rank} • {person.department} • {person.email}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
             {errors.personnel && <span className="error-message">{errors.personnel}</span>}
-            <small style={{ color: '#666', fontSize: '0.8rem' }}>
-              Note: In production, this would be a dropdown to select from existing personnel.
-            </small>
+            
+            {selectedPersonnel && (
+              <div className="selected-personnel">
+                <strong>Selected:</strong> {selectedPersonnel.firstName} {selectedPersonnel.lastName} 
+                ({selectedPersonnel.rank}) - {selectedPersonnel.department}
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -169,89 +302,52 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
               onChange={handleChange}
               className={errors.assignment ? 'error' : ''}
               disabled={loading}
-              placeholder="e.g., Security Detail, Training Mission"
+              placeholder="e.g., Security Detail, Training Mission, Equipment Maintenance"
             />
             {errors.assignment && <span className="error-message">{errors.assignment}</span>}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="unit">Unit*</label>
-            <select
-              id="unit"
-              name="unit"
-              value={formData.unit}
-              onChange={handleChange}
-              className={errors.unit ? 'error' : ''}
-              disabled={loading}
-            >
-              <option value="">Select Unit</option>
-              <option value="Operations">Operations</option>
-              <option value="Logistics">Logistics</option>
-              <option value="Training">Training</option>
-              <option value="Maintenance">Maintenance</option>
-              <option value="Intelligence">Intelligence</option>
-              <option value="Medical">Medical</option>
-            </select>
-            {errors.unit && <span className="error-message">{errors.unit}</span>}
-          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="unit">Unit*</label>
+              <select
+                id="unit"
+                name="unit"
+                value={formData.unit}
+                onChange={handleChange}
+                className={errors.unit ? 'error' : ''}
+                disabled={loading}
+              >
+                <option value="">Select Unit</option>
+                <option value="Operations">Operations</option>
+                <option value="Logistics">Logistics</option>
+                <option value="Training">Training</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Intelligence">Intelligence</option>
+                <option value="Medical">Medical</option>
+              </select>
+              {errors.unit && <span className="error-message">{errors.unit}</span>}
+            </div>
 
-          <div className="form-group">
-            <label htmlFor="location">Location*</label>
-            <input
-              type="text"
-              id="location"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              className={errors.location ? 'error' : ''}
-              disabled={loading}
-              placeholder="Assignment location"
-            />
-            {errors.location && <span className="error-message">{errors.location}</span>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="startDate">Start Date*</label>
-            <input
-              type="date"
-              id="startDate"
-              name="startDate"
-              value={formData.startDate}
-              onChange={handleChange}
-              className={errors.startDate ? 'error' : ''}
-              disabled={loading}
-            />
-            {errors.startDate && <span className="error-message">{errors.startDate}</span>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="endDate">End Date*</label>
-            <input
-              type="date"
-              id="endDate"
-              name="endDate"
-              value={formData.endDate}
-              onChange={handleChange}
-              className={errors.endDate ? 'error' : ''}
-              disabled={loading}
-            />
-            {errors.endDate && <span className="error-message">{errors.endDate}</span>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="priority">Priority</label>
-            <select
-              id="priority"
-              name="priority"
-              value={formData.priority}
-              onChange={handleChange}
-              disabled={loading}
-            >
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-              <option value="Critical">Critical</option>
-            </select>
+            <div className="form-group">
+              <label htmlFor="equipmentQuantity">Equipment Quantity*</label>
+              <input
+                type="number"
+                id="equipmentQuantity"
+                name="equipmentQuantity"
+                value={formData.equipmentQuantity}
+                onChange={handleChange}
+                min="1"
+                max={selectedEquipment?.quantityAvailable || 999}
+                className={errors.equipmentQuantity ? 'error' : ''}
+                disabled={loading}
+                placeholder="1"
+              />
+              {errors.equipmentQuantity && <span className="error-message">{errors.equipmentQuantity}</span>}
+              {selectedEquipment && (
+                <small>Maximum available: {selectedEquipment.quantityAvailable} units</small>
+              )}
+            </div>
           </div>
 
           <div className="form-group">
@@ -264,13 +360,13 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
               rows="4"
               className={errors.duties ? 'error' : ''}
               disabled={loading}
-              placeholder="Enter duties, one per line&#10;e.g., Guard duty&#10;Equipment maintenance&#10;Report writing"
+              placeholder="Enter duties, one per line&#10;e.g., Guard duty&#10;Equipment maintenance&#10;Report writing&#10;Training new personnel"
             />
             {errors.duties && <span className="error-message">{errors.duties}</span>}
           </div>
 
           <div className="form-group">
-            <label htmlFor="description">Description</label>
+            <label htmlFor="description">Additional Description</label>
             <textarea
               id="description"
               name="description"
@@ -278,8 +374,61 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
               onChange={handleChange}
               rows="3"
               disabled={loading}
-              placeholder="Additional assignment details..."
+              placeholder="Additional assignment details, special instructions, or notes..."
             />
+          </div>
+
+          {/* Equipment Assignment Section */}
+          <div className="equipment-section">
+            <h3>Equipment Assignment (Optional)</h3>
+            
+            <div className="form-group">
+              <label htmlFor="equipmentSearch">Search & Select Equipment</label>
+              <div className="personnel-search-container">
+                <input
+                  type="text"
+                  id="equipmentSearch"
+                  value={equipmentSearch}
+                  onChange={handleEquipmentSearch}
+                  onFocus={() => setShowEquipmentDropdown(true)}
+                  disabled={loading}
+                  placeholder="Type to search available equipment..."
+                />
+                
+                {showEquipmentDropdown && (
+                  <div className="personnel-dropdown">
+                    {equipmentLoading ? (
+                      <div className="personnel-option loading">Loading equipment...</div>
+                    ) : availableEquipment.length === 0 ? (
+                      <div className="personnel-option loading">No available equipment found</div>
+                    ) : (
+                      availableEquipment.map((equipment) => (
+                        <div
+                          key={equipment._id}
+                          className="personnel-option"
+                          onClick={() => handleEquipmentSelect(equipment)}
+                        >
+                          <div className="personnel-name">
+                            {equipment.item}
+                          </div>
+                          <div className="personnel-details">
+                            {equipment.category} • Available: {equipment.quantityAvailable} • Supplier: {equipment.supplier}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {selectedEquipment && (
+                <div className="selected-personnel">
+                  <strong>Selected Equipment:</strong> {selectedEquipment.item} ({selectedEquipment.category})
+                  <br />
+                  <small>Available: {selectedEquipment.quantityAvailable} units • Supplier: {selectedEquipment.supplier}</small>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="form-actions">

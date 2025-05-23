@@ -30,6 +30,12 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Department is required'],
     enum: ['Operations', 'Logistics', 'Training', 'Maintenance', 'Intelligence', 'Medical']
   },
+  base: {
+    type: String,
+    required: [true, 'Base assignment is required'],
+    enum: ['Base A', 'Base B', 'Base C', 'Base D', 'Headquarters'],
+    default: 'Base A'
+  },
   password: {
     type: String,
     required: [true, 'Password is required'],

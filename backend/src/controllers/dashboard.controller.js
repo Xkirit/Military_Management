@@ -4,37 +4,32 @@ const Transfer = require('../models/transfer.model');
 const Purchase = require('../models/purchase.model');
 const User = require('../models/user.model');
 
-// Get dashboard metrics
+// Get base-specific dashboard metrics
 exports.getDashboardMetrics = async (req, res) => {
   try {
-    const { startDate, endDate, department } = req.query;
+    const { department } = req.query; // Remove date filtering
+    const userBase = req.user.base; // Get user's base from authenticated user
     
-    // Default date range to a broader range (last year) if not provided
-    const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear() - 1, 0, 1);
-    const end = endDate ? new Date(endDate) : new Date();
-    
-    console.log(`Dashboard metrics - Date range: ${start.toISOString()} to ${end.toISOString()}`);
+    console.log(`Dashboard metrics for ${userBase} - All-time data`);
     console.log(`Department filter: ${department || 'None'}`);
     
-    // Build base query for date filtering
-    const dateQuery = {
-      createdAt: {
-        $gte: start,
-        $lte: end
-      }
-    };
-    
-    // Add department filter if provided (only for expenditures)
-    const expenditureQuery = { ...dateQuery };
-    if (department) {
-      expenditureQuery.department = department;
-    }
+    // No date filtering - show all-time data
+    const dateQuery = {}; // Empty query for all-time data
 
-    // Get assignments summary
+    // Get base-specific user IDs (personnel from this base)
+    const baseUserIds = await User.find({ base: userBase }).distinct('_id');
+    console.log(`Found ${baseUserIds.length} personnel in ${userBase}`);
+
+    // Build base-specific queries
+    const baseQuery = {
+      requestedBy: { $in: baseUserIds }
+    };
+
+    // Get assignments for base personnel
     const assignmentsStats = await Assignment.aggregate([
       {
         $match: {
-          createdAt: { $gte: start, $lte: end }
+          personnel: { $in: baseUserIds }
         }
       },
       {
@@ -45,7 +40,12 @@ exports.getDashboardMetrics = async (req, res) => {
       }
     ]);
 
-    // Get expenditures summary
+    // Get expenditures by base personnel
+    const expenditureQuery = {};
+    if (department) {
+      expenditureQuery.department = department;
+    }
+    
     const expendituresStats = await Expenditure.aggregate([
       {
         $match: expenditureQuery
@@ -59,7 +59,81 @@ exports.getDashboardMetrics = async (req, res) => {
       }
     ]);
 
-    // Get total expenditure amount
+    // Get transfers OUT of this base (source = current base)
+    const transfersOutStats = await Transfer.aggregate([
+      {
+        $match: {
+          sourceBaseId: userBase
+        }
+      },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalQuantity: { $sum: '$quantity' }
+        }
+      }
+    ]);
+
+    // Get transfers INTO this base (destination = current base)
+    const transfersInStats = await Transfer.aggregate([
+      {
+        $match: {
+          destinationBaseId: userBase
+        }
+      },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalQuantity: { $sum: '$quantity' }
+        }
+      }
+    ]);
+
+    // Get purchases by base personnel
+    const purchasesStats = await Purchase.aggregate([
+      {
+        $match: baseQuery
+      },
+      {
+        $group: {
+          _id: '$status',
+          totalAmount: { $sum: { $multiply: ['$quantity', '$unitPrice'] } },
+          count: { $sum: 1 },
+          totalQuantity: { $sum: '$quantity' }
+        }
+      }
+    ]);
+
+    // Calculate net movement
+    const totalTransfersOut = transfersOutStats.reduce((acc, stat) => acc + (stat.totalQuantity || 0), 0);
+    const totalTransfersIn = transfersInStats.reduce((acc, stat) => acc + (stat.totalQuantity || 0), 0);
+    const totalPurchasesQuantity = purchasesStats.reduce((acc, stat) => acc + (stat.totalQuantity || 0), 0);
+    
+    const netMovement = {
+      flowingIn: totalTransfersIn + totalPurchasesQuantity, // Materials coming into base
+      flowingOut: totalTransfersOut, // Materials leaving base
+      netBalance: (totalTransfersIn + totalPurchasesQuantity) - totalTransfersOut
+    };
+
+    // Get base personnel count
+    const basePersonnelCount = await User.countDocuments({ base: userBase });
+    
+    // Get personnel by department within the base
+    const personnelByDepartment = await User.aggregate([
+      {
+        $match: { base: userBase }
+      },
+      {
+        $group: {
+          _id: '$department',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Get total amounts
     const totalExpenditures = await Expenditure.aggregate([
       {
         $match: expenditureQuery
@@ -72,56 +146,9 @@ exports.getDashboardMetrics = async (req, res) => {
       }
     ]);
 
-    // Get transfers summary
-    const transfersStats = await Transfer.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: start, $lte: end }
-        }
-      },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Get purchases summary
-    const purchasesStats = await Purchase.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: start, $lte: end }
-        }
-      },
-      {
-        $group: {
-          _id: '$status',
-          totalAmount: { $sum: { $multiply: ['$quantity', '$unitPrice'] } },
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Get total users count
-    const totalUsers = await User.countDocuments();
-    
-    // Get users by department
-    const usersByDepartment = await User.aggregate([
-      {
-        $group: {
-          _id: '$department',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Get total purchases amount
     const totalPurchases = await Purchase.aggregate([
       {
-        $match: {
-          createdAt: { $gte: start, $lte: end }
-        }
+        $match: baseQuery
       },
       {
         $group: {
@@ -131,21 +158,14 @@ exports.getDashboardMetrics = async (req, res) => {
       }
     ]);
 
-    // Log counts for debugging
-    console.log('Database counts:');
-    console.log(`- Total purchases in period: ${purchasesStats.reduce((acc, stat) => acc + stat.count, 0)}`);
-    console.log(`- Total expenditures in period: ${expendituresStats.reduce((acc, stat) => acc + stat.count, 0)}`);
-    console.log(`- Total assignments in period: ${assignmentsStats.reduce((acc, stat) => acc + stat.count, 0)}`);
-    console.log(`- Total transfers in period: ${transfersStats.reduce((acc, stat) => acc + stat.count, 0)}`);
-    console.log(`- Total users: ${totalUsers}`);
-
     // Transform data for frontend
     const transformStats = (stats) => {
       const result = {};
       stats.forEach(stat => {
         result[stat._id] = {
           count: stat.count,
-          amount: stat.totalAmount || 0
+          amount: stat.totalAmount || 0,
+          quantity: stat.totalQuantity || 0
         };
       });
       return result;
@@ -160,15 +180,14 @@ exports.getDashboardMetrics = async (req, res) => {
     };
 
     const metrics = {
+      base: userBase,
       summary: {
         totalExpenditures: totalExpenditures[0]?.total || 0,
         totalPurchases: totalPurchases[0]?.total || 0,
-        totalUsers,
-        dateRange: {
-          start: start.toISOString().split('T')[0],
-          end: end.toISOString().split('T')[0]
-        }
+        basePersonnel: basePersonnelCount,
+        period: 'All-time'
       },
+      netMovement,
       assignments: {
         total: assignmentsStats.reduce((acc, stat) => acc + stat.count, 0),
         byStatus: transformStats(assignmentsStats)
@@ -178,22 +197,29 @@ exports.getDashboardMetrics = async (req, res) => {
         totalAmount: expendituresStats.reduce((acc, stat) => acc + (stat.totalAmount || 0), 0),
         byStatus: transformStats(expendituresStats)
       },
-      transfers: {
-        total: transfersStats.reduce((acc, stat) => acc + stat.count, 0),
-        byStatus: transformStats(transfersStats)
+      transfersOut: {
+        total: transfersOutStats.reduce((acc, stat) => acc + stat.count, 0),
+        totalQuantity: totalTransfersOut,
+        byStatus: transformStats(transfersOutStats)
+      },
+      transfersIn: {
+        total: transfersInStats.reduce((acc, stat) => acc + stat.count, 0),
+        totalQuantity: totalTransfersIn,
+        byStatus: transformStats(transfersInStats)
       },
       purchases: {
         total: purchasesStats.reduce((acc, stat) => acc + stat.count, 0),
         totalAmount: purchasesStats.reduce((acc, stat) => acc + (stat.totalAmount || 0), 0),
+        totalQuantity: totalPurchasesQuantity,
         byStatus: transformStats(purchasesStats)
       },
-      users: {
-        total: totalUsers,
-        byDepartment: transformDepartmentStats(usersByDepartment)
+      personnel: {
+        total: basePersonnelCount,
+        byDepartment: transformDepartmentStats(personnelByDepartment)
       }
     };
 
-    console.log('Sending metrics:', JSON.stringify(metrics, null, 2));
+    console.log(`Sending base-specific metrics for ${userBase}:`, JSON.stringify(metrics, null, 2));
     res.status(200).json(metrics);
   } catch (error) {
     console.error('Dashboard metrics error:', error);
@@ -207,18 +233,9 @@ exports.getDashboardMetrics = async (req, res) => {
 // Get department-wise summary
 exports.getDepartmentSummary = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-    
-    // Use broader date range by default
-    const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear() - 1, 0, 1);
-    const end = endDate ? new Date(endDate) : new Date();
+    console.log('Getting department summary - All-time data');
 
     const departmentSummary = await Expenditure.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: start, $lte: end }
-        }
-      },
       {
         $group: {
           _id: '$department',
@@ -331,6 +348,130 @@ exports.getRecentActivities = async (req, res) => {
     console.error('Recent activities error:', error);
     res.status(500).json({
       message: 'Error fetching recent activities',
+      error: error.message
+    });
+  }
+};
+
+// Get detailed net movement information
+exports.getNetMovementDetails = async (req, res) => {
+  try {
+    const userBase = req.user.base;
+    
+    console.log(`Getting net movement details for ${userBase} - All-time data`);
+    
+    // Get base personnel IDs
+    const baseUserIds = await User.find({ base: userBase }).distinct('_id');
+    
+    // Get purchases (inflow) with equipment details - all-time
+    const purchases = await Purchase.find({
+      requestedBy: { $in: baseUserIds }
+    })
+    .populate('requestedBy', 'firstName lastName rank department')
+    .sort('-createdAt')
+    .limit(50);
+    
+    // Get transfers OUT (outflow) - all-time
+    const transfersOut = await Transfer.find({
+      sourceBaseId: userBase
+    })
+    .populate('requestedBy', 'firstName lastName rank department')
+    .sort('-createdAt')
+    .limit(50);
+    
+    // Get transfers IN (inflow) - all-time
+    const transfersIn = await Transfer.find({
+      destinationBaseId: userBase
+    })
+    .populate('requestedBy', 'firstName lastName rank department')
+    .sort('-createdAt')
+    .limit(50);
+    
+    // Format the data for frontend
+    const movements = {
+      inflow: [
+        ...purchases.map(purchase => ({
+          id: purchase._id,
+          type: 'purchase',
+          title: purchase.item,
+          category: purchase.category,
+          quantity: purchase.quantity,
+          amount: purchase.quantity * purchase.unitPrice,
+          status: purchase.status,
+          date: purchase.createdAt,
+          user: purchase.requestedBy ? 
+            `${purchase.requestedBy.firstName} ${purchase.requestedBy.lastName}` : 
+            'Unknown',
+          department: purchase.requestedBy?.department || purchase.department,
+          details: {
+            supplier: purchase.supplier,
+            unitPrice: purchase.unitPrice,
+            specifications: purchase.specifications
+          }
+        })),
+        ...transfersIn.map(transfer => ({
+          id: transfer._id,
+          type: 'transfer_in',
+          title: `Transfer from ${transfer.sourceBaseId}`,
+          category: 'Transfer',
+          quantity: transfer.quantity,
+          amount: 0, // Transfers don't have monetary value
+          status: transfer.status,
+          date: transfer.createdAt,
+          user: transfer.requestedBy ? 
+            `${transfer.requestedBy.firstName} ${transfer.requestedBy.lastName}` : 
+            'Unknown',
+          department: transfer.requestedBy?.department || 'Unknown',
+          details: {
+            equipmentId: transfer.equipmentId,
+            reason: transfer.reason,
+            transportMethod: transfer.transportMethod
+          }
+        }))
+      ],
+      outflow: transfersOut.map(transfer => ({
+        id: transfer._id,
+        type: 'transfer_out',
+        title: `Transfer to ${transfer.destinationBaseId}`,
+        category: 'Transfer',
+        quantity: transfer.quantity,
+        amount: 0,
+        status: transfer.status,
+        date: transfer.createdAt,
+        user: transfer.requestedBy ? 
+          `${transfer.requestedBy.firstName} ${transfer.requestedBy.lastName}` : 
+          'Unknown',
+        department: transfer.requestedBy?.department || 'Unknown',
+        details: {
+          equipmentId: transfer.equipmentId,
+          reason: transfer.reason,
+          transportMethod: transfer.transportMethod
+        }
+      }))
+    };
+    
+    // Calculate totals
+    const summary = {
+      inflowTotal: movements.inflow.reduce((acc, item) => acc + item.quantity, 0),
+      inflowValue: movements.inflow.reduce((acc, item) => acc + item.amount, 0),
+      outflowTotal: movements.outflow.reduce((acc, item) => acc + item.quantity, 0),
+      outflowValue: movements.outflow.reduce((acc, item) => acc + item.amount, 0),
+      netQuantity: movements.inflow.reduce((acc, item) => acc + item.quantity, 0) - 
+                   movements.outflow.reduce((acc, item) => acc + item.quantity, 0),
+      netValue: movements.inflow.reduce((acc, item) => acc + item.amount, 0) - 
+                movements.outflow.reduce((acc, item) => acc + item.amount, 0)
+    };
+    
+    res.status(200).json({
+      base: userBase,
+      period: 'All-time',
+      summary,
+      movements
+    });
+  } catch (error) {
+    console.error('Net movement details error:', error);
+    res.status(500).json({
+      message: 'Error fetching net movement details',
       error: error.message
     });
   }

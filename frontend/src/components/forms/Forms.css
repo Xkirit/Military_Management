@@ -24,6 +24,10 @@
   animation: slideIn 0.3s ease-out;
 }
 
+.modal-content.large {
+  max-width: 800px;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -142,6 +146,109 @@
   margin-top: 0.25rem;
 }
 
+/* Form Row Layout */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Personnel Search Styles */
+.personnel-search-container {
+  position: relative;
+}
+
+.personnel-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.personnel-option {
+  padding: 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.personnel-option:hover {
+  background-color: #f8f9fa;
+}
+
+.personnel-option:last-child {
+  border-bottom: none;
+}
+
+.personnel-option.loading {
+  text-align: center;
+  font-style: italic;
+  color: #666;
+  cursor: default;
+}
+
+.personnel-option.loading:hover {
+  background-color: white;
+}
+
+.personnel-name {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 0.25rem;
+}
+
+.personnel-details {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.selected-personnel {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color: #e8f5e8;
+  border: 1px solid #4caf50;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #2e7d32;
+}
+
+/* Equipment Section Styles */
+.equipment-section {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin: 2rem 0;
+  border: 1px solid #e9ecef;
+}
+
+.equipment-section h3 {
+  margin: 0 0 1rem 0;
+  color: #495057;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* Total Amount Display */
+.total-amount {
+  background: #e3f2fd;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  margin: 1rem 0;
+  border: 1px solid #1976d2;
+  color: #1565c0;
+  font-size: 1.1rem;
+}
+
 .form-actions {
   display: flex;
   gap: 1rem;
@@ -203,26 +310,32 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.8);
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: #666;
 }
 
-/* Responsive adjustments */
+/* Responsive design */
 @media (max-width: 768px) {
   .modal-content {
     width: 95%;
     max-height: 95vh;
-    margin: 2.5vh auto;
   }
 
   .modal-header {
-    padding: var(--spacing-md, 1rem) var(--spacing-lg, 1.5rem);
+    padding: 1rem;
   }
 
   .form-container {
-    padding: var(--spacing-lg, 1.5rem);
+    padding: 1rem;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
   }
 
   .form-actions {
@@ -231,6 +344,19 @@
 
   .submit-button,
   .cancel-button {
-    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .personnel-dropdown {
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    top: auto;
+    max-height: 150px;
+  }
+
+  .equipment-section {
+    padding: 1rem;
+    margin: 1rem 0;
   }
 } 

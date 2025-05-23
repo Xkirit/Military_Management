@@ -103,8 +103,64 @@ const getMe = async (req, res) => {
   }
 };
 
+// Search users/personnel
+const searchUsers = async (req, res) => {
+  try {
+    const { search = '', department = '', rank = '', limit = 50 } = req.query;
+    
+    // Build search query
+    const query = {};
+    
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (department) {
+      query.department = department;
+    }
+    
+    if (rank) {
+      query.rank = rank;
+    }
+    
+    console.log('User search query:', query);
+    
+    const users = await User.find(query)
+      .select('firstName lastName email rank department createdAt')
+      .limit(parseInt(limit))
+      .sort({ firstName: 1, lastName: 1 });
+    
+    console.log(`Found ${users.length} users matching search criteria`);
+    
+    res.json(users);
+  } catch (error) {
+    console.error('Search users error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get all users (for admin purposes)
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find()
+      .select('firstName lastName email rank department createdAt')
+      .sort({ firstName: 1, lastName: 1 });
+    
+    res.json(users);
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   register,
   login,
-  getMe
+  getMe,
+  searchUsers,
+  getAllUsers
 }; 

@@ -21,6 +21,30 @@ const transferSchema = new mongoose.Schema({
     required: [true, 'Destination location is required'],
     trim: true
   },
+  sourceBaseId: {
+    type: String,
+    required: [true, 'Source base is required'],
+    enum: ['Base A', 'Base B', 'Base C', 'Base D', 'Headquarters']
+  },
+  destinationBaseId: {
+    type: String,
+    required: [true, 'Destination base is required'],
+    enum: ['Base A', 'Base B', 'Base C', 'Base D', 'Headquarters']
+  },
+  equipmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Purchase' // Reference to the equipment being transferred
+  },
+  reason: {
+    type: String,
+    trim: true,
+    default: 'Equipment transfer'
+  },
+  transportMethod: {
+    type: String,
+    enum: ['Ground Transport', 'Air Transport', 'Naval Transport', 'Personnel Carry'],
+    default: 'Ground Transport'
+  },
   status: {
     type: String,
     required: true,

@@ -63,7 +63,7 @@ const Login = ({ onLogin }) => {
         localStorage.setItem('user', JSON.stringify(userData));
         
         // Update auth state and redirect
-        
+        console.log('Login successful');
         navigate('/dashboard');
         toast.success('Login successful');
       } catch (error) {

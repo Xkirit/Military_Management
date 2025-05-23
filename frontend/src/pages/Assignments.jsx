@@ -36,11 +36,15 @@ const Assignments = () => {
       `${assignment.personnel.firstName || ''} ${assignment.personnel.lastName || ''}`.trim() : 
       'N/A';
     
+    const equipmentName = assignment.equipmentPurchase?.item || assignment.equipment || '';
+    const equipmentCategory = assignment.equipmentPurchase?.category || assignment.equipmentType || '';
+    
     const matchesSearch = !searchTerm || 
       personnelName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       assignment.assignment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      assignment.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      assignment.unit?.toLowerCase().includes(searchTerm.toLowerCase());
+      assignment.unit?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      equipmentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      equipmentCategory.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = !statusFilter || assignment.status === statusFilter;
     
@@ -122,7 +126,7 @@ const Assignments = () => {
       <div className="filters">
         <input
           type="text"
-          placeholder="Search assignments..."
+          placeholder="Search assignments, personnel, equipment..."
           className="search-input"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -152,10 +156,8 @@ const Assignments = () => {
                 <th>Rank</th>
                 <th>Assignment</th>
                 <th>Unit</th>
-                <th>Location</th>
-                <th>Start Date</th>
-                <th>End Date</th>
-                <th>Priority</th>
+                <th>Equipment</th>
+                <th>Qty</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -163,7 +165,7 @@ const Assignments = () => {
             <tbody>
               {filteredAssignments.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="no-data-message">
+                  <td colSpan="9" className="no-data-message">
                     No assignments found
                   </td>
                 </tr>
@@ -180,14 +182,31 @@ const Assignments = () => {
                     <td>{assignment.personnel?.rank || 'N/A'}</td>
                     <td>{assignment.assignment}</td>
                     <td>{assignment.unit}</td>
-                    <td>{assignment.location}</td>
-                    <td>{new Date(assignment.startDate).toLocaleDateString()}</td>
-                    <td>{new Date(assignment.endDate).toLocaleDateString()}</td>
                     <td>
-                      <span className={`priority-badge ${assignment.priority?.toLowerCase()}`}>
-                        {assignment.priority}
-                      </span>
+                      <div className="equipment-cell">
+                        {assignment.equipmentPurchase ? (
+                          <>
+                            <div className="equipment-type">
+                              {assignment.equipmentPurchase.item}
+                              
+                            </div>
+                          </>
+                        ) : assignment.equipmentType || assignment.equipment ? (
+                          // Legacy equipment display
+                          <>
+                            {assignment.equipmentType && (
+                              <span className="equipment-type">{assignment.equipmentType}</span>
+                            )}
+                            {assignment.equipment && (
+                              <div className="equipment-details">{assignment.equipment}</div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="no-equipment">No Equipment</span>
+                        )}
+                      </div>
                     </td>
+                    <td>{assignment.equipmentQuantity || 'N/A'}</td>
                     <td>
                       <select
                         className={`status-select ${assignment.status.toLowerCase()}`}

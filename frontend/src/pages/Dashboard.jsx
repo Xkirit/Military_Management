@@ -1,51 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { dashboardService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import './Dashboard.css';
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const [metrics, setMetrics] = useState({
+    base: '',
     summary: {
       totalExpenditures: 0,
       totalPurchases: 0,
-      totalUsers: 0,
+      basePersonnel: 0,
       dateRange: { start: '', end: '' }
+    },
+    netMovement: {
+      flowingIn: 0,
+      flowingOut: 0,
+      netBalance: 0
     },
     assignments: { total: 0, byStatus: {} },
     expenditures: { total: 0, totalAmount: 0, byStatus: {} },
-    transfers: { total: 0, byStatus: {} },
-    purchases: { total: 0, totalAmount: 0, byStatus: {} },
-    users: { total: 0, byDepartment: {} }
+    transfersOut: { total: 0, totalQuantity: 0, byStatus: {} },
+    transfersIn: { total: 0, totalQuantity: 0, byStatus: {} },
+    purchases: { total: 0, totalAmount: 0, totalQuantity: 0, byStatus: {} },
+    personnel: { total: 0, byDepartment: {} }
   });
 
+  const [netMovementDetails, setNetMovementDetails] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
   const [departmentSummary, setDepartmentSummary] = useState([]);
 
   const [filters, setFilters] = useState({
-    // Default to last year to capture all data
-    startDate: new Date(new Date().getFullYear() - 1, 0, 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
     department: ''
   });
 
+  const [showNetMovement, setShowNetMovement] = useState(false);
   const [showActivities, setShowActivities] = useState(false);
   const [showDepartments, setShowDepartments] = useState(false);
-  const [showUsers, setShowUsers] = useState(false);
+  const [showPersonnel, setShowPersonnel] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
-  }, [filters]);
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      console.log('Fetching dashboard data with filters:', filters);
+      console.log('Fetching base-specific dashboard data (all-time)');
       
       const [metricsResponse, activitiesResponse, departmentsResponse] = await Promise.all([
-        dashboardService.getMetrics(filters),
+        dashboardService.getMetrics({}), // No date filtering
         dashboardService.getRecentActivities({ limit: 20 }),
-        dashboardService.getDepartmentSummary(filters)
+        dashboardService.getDepartmentSummary({})
       ]);
       
       console.log('Dashboard API responses:', {
@@ -63,12 +71,15 @@ const Dashboard = () => {
       
       // Set default empty state on error
       setMetrics({
-        summary: { totalExpenditures: 0, totalPurchases: 0, totalUsers: 0, dateRange: { start: '', end: '' } },
+        base: user?.base || 'Unknown',
+        summary: { totalExpenditures: 0, totalPurchases: 0, basePersonnel: 0, dateRange: { start: '', end: '' } },
+        netMovement: { flowingIn: 0, flowingOut: 0, netBalance: 0 },
         assignments: { total: 0, byStatus: {} },
         expenditures: { total: 0, totalAmount: 0, byStatus: {} },
-        transfers: { total: 0, byStatus: {} },
-        purchases: { total: 0, totalAmount: 0, byStatus: {} },
-        users: { total: 0, byDepartment: {} }
+        transfersOut: { total: 0, totalQuantity: 0, byStatus: {} },
+        transfersIn: { total: 0, totalQuantity: 0, byStatus: {} },
+        purchases: { total: 0, totalAmount: 0, totalQuantity: 0, byStatus: {} },
+        personnel: { total: 0, byDepartment: {} }
       });
       setRecentActivities([]);
       setDepartmentSummary([]);
@@ -77,13 +88,16 @@ const Dashboard = () => {
     }
   };
 
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    console.log(`Filter changed: ${name} = ${value}`);
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  const fetchNetMovementDetails = async () => {
+    try {
+      console.log('Fetching net movement details (all-time)...');
+      const response = await dashboardService.getNetMovementDetails({});
+      setNetMovementDetails(response.data);
+      setShowNetMovement(true);
+    } catch (error) {
+      console.error('Error fetching net movement details:', error);
+      toast.error('Failed to fetch net movement details');
+    }
   };
 
   const handleExport = () => {
@@ -129,7 +143,8 @@ const Dashboard = () => {
   // Calculate total transactions
   const totalTransactions = (metrics.assignments?.total || 0) + 
                           (metrics.expenditures?.total || 0) + 
-                          (metrics.transfers?.total || 0) + 
+                          (metrics.transfersOut?.total || 0) + 
+                          (metrics.transfersIn?.total || 0) + 
                           (metrics.purchases?.total || 0);
 
   // Calculate total expenditures from purchases (this is the main spending)
@@ -153,78 +168,61 @@ const Dashboard = () => {
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        <h1>Dashboard</h1>
+        <h1>Dashboard - {metrics.base || user?.base || 'Unknown Base'}</h1>
         <button className="export-button" onClick={handleExport}>
           Export Data
         </button>
       </div>
 
-      <div className="filters-section">
-        <div className="filter-group">
-          <label>Date Range</label>
-          <input
-            type="date"
-            name="startDate"
-            value={filters.startDate}
-            onChange={handleFilterChange}
-          />
-          <span>to</span>
-          <input
-            type="date"
-            name="endDate"
-            value={filters.endDate}
-            onChange={handleFilterChange}
-          />
+      {/* <div className="filters-section">
+        <div className="base-info">
+          <h3>📍 Current Base: {metrics.base || user?.base || 'Unknown Base'}</h3>
+          <p>Showing all-time data for personnel assigned to this base</p>
         </div>
-
-        <div className="filter-group">
-          <label>Department</label>
-          <select
-            name="department"
-            value={filters.department}
-            onChange={handleFilterChange}
-          >
-            <option value="">All Departments</option>
-            <option value="Operations">Operations</option>
-            <option value="Logistics">Logistics</option>
-            <option value="Training">Training</option>
-            <option value="Maintenance">Maintenance</option>
-            <option value="Intelligence">Intelligence</option>
-            <option value="Medical">Medical</option>
-          </select>
-        </div>
-      </div>
+      </div> */}
 
       {loading ? (
         <div className="loading-message">Loading dashboard data...</div>
       ) : (
         <>
           <div className="metrics-grid">
-            <div className="metric-card">
-              <h3>💰 Total Expenditures</h3>
-              <p className="metric-value">{formatCurrency(grandTotalExpenditures)}</p>
+            <div 
+              className="metric-card clickable net-movement-card"
+              onClick={fetchNetMovementDetails}
+            >
+              <h3>📊 Net Movement</h3>
+              <p className="metric-value">{metrics.netMovement?.netBalance || 0}</p>
               <small className="metric-subtitle">
-                Purchases: {formatCurrency(totalExpendituresFromPurchases)} + Other: {formatCurrency(otherExpenditures)}
+                In: {metrics.netMovement?.flowingIn || 0} units | 
+                Out: {metrics.netMovement?.flowingOut || 0} units
                 <br />
-                Period: {metrics.summary?.dateRange?.start} to {metrics.summary?.dateRange?.end}
+                <strong>Click for details</strong>
               </small>
             </div>
 
             <div className="metric-card">
-              <h3>🛒 Purchase Orders</h3>
-              <p className="metric-value">{formatCurrency(totalExpendituresFromPurchases)}</p>
+              <h3>💰 Base Expenditures</h3>
+              <p className="metric-value">{formatCurrency(metrics.summary?.totalExpenditures || 0)}</p>
               <small className="metric-subtitle">
-                Equipment & supplies ({metrics.purchases?.total || 0} orders)
+                All-time equipment & supplies for {metrics.base}
+              </small>
+            </div>
+
+            <div className="metric-card">
+              <h3>🛒 Purchase Value</h3>
+              <p className="metric-value">{formatCurrency(metrics.purchases?.totalAmount || 0)}</p>
+              <small className="metric-subtitle">
+                {metrics.purchases?.total || 0} orders ({metrics.purchases?.totalQuantity || 0} items)
               </small>
             </div>
 
             <div 
               className="metric-card clickable"
-              onClick={() => setShowUsers(true)}
+              onClick={() => setShowPersonnel(true)}
             >
-              <h3>👥 Total Users</h3>
-              <p className="metric-value">{metrics.summary?.totalUsers || 0}</p>
-              <small className="metric-subtitle">Registered personnel</small>
+              <h3>👥 Base Personnel</h3>
+              <p className="metric-value">{metrics.summary?.basePersonnel || 0}</p>
+              <small className="metric-subtitle">Personnel assigned to {metrics.base}</small>
             </div>
 
             <div 
@@ -234,14 +232,6 @@ const Dashboard = () => {
               <h3>📋 Recent Activities</h3>
               <p className="metric-value">{recentActivities.length}</p>
               <small className="metric-subtitle">Click to view details</small>
-            </div>
-
-            <div className="metric-card">
-              <h3>📊 Total Transactions</h3>
-              <p className="metric-value">{totalTransactions}</p>
-              <small className="metric-subtitle">
-                A:{metrics.assignments?.total || 0} | E:{metrics.expenditures?.total || 0} | T:{metrics.transfers?.total || 0} | P:{metrics.purchases?.total || 0}
-              </small>
             </div>
 
             <div 
@@ -309,10 +299,28 @@ const Dashboard = () => {
             <div className="summary-section">
               <h3>🚚 Transfer Status</h3>
               <div className="status-grid">
-                {Object.keys(metrics.transfers?.byStatus || {}).length === 0 ? (
-                  <div className="no-data-message">No transfers found in selected period</div>
+                {Object.keys(metrics.transfersOut?.byStatus || {}).length === 0 ? (
+                  <div className="no-data-message">No outgoing transfers found in selected period</div>
                 ) : (
-                  Object.entries(metrics.transfers.byStatus).map(([status, data]) => (
+                  Object.entries(metrics.transfersOut.byStatus).map(([status, data]) => (
+                    <div key={status} className="status-item">
+                      <span className={`status-badge ${getStatusBadgeClass(status)}`}>
+                        {status}
+                      </span>
+                      <span className="status-count">{data.count}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="summary-section">
+              <h3>🚚 Transfer Status</h3>
+              <div className="status-grid">
+                {Object.keys(metrics.transfersIn?.byStatus || {}).length === 0 ? (
+                  <div className="no-data-message">No incoming transfers found in selected period</div>
+                ) : (
+                  Object.entries(metrics.transfersIn.byStatus).map(([status, data]) => (
                     <div key={status} className="status-item">
                       <span className={`status-badge ${getStatusBadgeClass(status)}`}>
                         {status}
@@ -427,33 +435,149 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Users Summary Modal */}
-      {showUsers && (
+      {/* Personnel Summary Modal */}
+      {showPersonnel && (
         <div className="modal-overlay">
           <div className="modal-content large">
             <div className="modal-header">
-              <h2>Users by Department</h2>
+              <h2>Personnel by Department</h2>
               <button 
                 className="close-button"
-                onClick={() => setShowUsers(false)}
+                onClick={() => setShowPersonnel(false)}
               >
                 ×
               </button>
             </div>
             <div className="departments-list">
-              {Object.keys(metrics.users?.byDepartment || {}).length === 0 ? (
-                <div className="no-data-message">No user data found</div>
+              {Object.keys(metrics.personnel?.byDepartment || {}).length === 0 ? (
+                <div className="no-data-message">No personnel data found</div>
               ) : (
-                Object.entries(metrics.users.byDepartment).map(([dept, count]) => (
+                Object.entries(metrics.personnel.byDepartment).map(([dept, count]) => (
                   <div key={dept} className="department-item">
                     <h4>👥 {dept}</h4>
                     <div className="department-stats">
-                      <span>👤 Users: {count}</span>
-                      <span>📊 Percentage: {((count / metrics.users.total) * 100).toFixed(1)}%</span>
+                      <span>👤 Personnel: {count}</span>
+                      <span>📊 Percentage: {((count / metrics.personnel.total) * 100).toFixed(1)}%</span>
                     </div>
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Net Movement Details Modal */}
+      {showNetMovement && netMovementDetails && (
+        <div className="modal-overlay">
+          <div className="modal-content large">
+            <div className="modal-header">
+              <h2>Net Movement Details - {netMovementDetails.base}</h2>
+              <button 
+                className="close-button"
+                onClick={() => setShowNetMovement(false)}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="net-movement-summary">
+              <div className="movement-stats">
+                <div className="stat-item inflow">
+                  <h4>📈 Materials Flowing In</h4>
+                  <p>{netMovementDetails.summary.inflowTotal} units</p>
+                  <small>{formatCurrency(netMovementDetails.summary.inflowValue)}</small>
+                </div>
+                <div className="stat-item outflow">
+                  <h4>📉 Materials Flowing Out</h4>
+                  <p>{netMovementDetails.summary.outflowTotal} units</p>
+                  <small>{formatCurrency(netMovementDetails.summary.outflowValue)}</small>
+                </div>
+                <div className="stat-item net">
+                  <h4>📊 Net Balance</h4>
+                  <p className={netMovementDetails.summary.netQuantity >= 0 ? 'positive' : 'negative'}>
+                    {netMovementDetails.summary.netQuantity} units
+                  </p>
+                  <small>{formatCurrency(netMovementDetails.summary.netValue)}</small>
+                </div>
+              </div>
+            </div>
+
+            <div className="movement-details">
+              <div className="movement-section">
+                <h3>📈 Inflow ({netMovementDetails.movements.inflow.length} items)</h3>
+                <div className="movement-list">
+                  {netMovementDetails.movements.inflow.length === 0 ? (
+                    <div className="no-data-message">No inflow found in selected period</div>
+                  ) : (
+                    netMovementDetails.movements.inflow.map((item) => (
+                      <div key={`${item.type}-${item.id}`} className="movement-item inflow">
+                        <div className="movement-icon">
+                          {item.type === 'purchase' ? '🛒' : '📦'}
+                        </div>
+                        <div className="movement-content">
+                          <div className="movement-title">
+                            <strong>{item.title}</strong>
+                            <span className={`status-badge ${getStatusBadgeClass(item.status)}`}>
+                              {item.status}
+                            </span>
+                          </div>
+                          <div className="movement-details-small">
+                            <span>👤 {item.user}</span>
+                            <span>🏢 {item.department}</span>
+                            <span>📦 Qty: {item.quantity}</span>
+                            {item.amount > 0 && (
+                              <span>💰 {formatCurrency(item.amount)}</span>
+                            )}
+                            <span>📅 {formatDate(item.date)}</span>
+                          </div>
+                          {item.details.supplier && (
+                            <div className="movement-supplier">
+                              <small>Supplier: {item.details.supplier}</small>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="movement-section">
+                <h3>📉 Outflow ({netMovementDetails.movements.outflow.length} items)</h3>
+                <div className="movement-list">
+                  {netMovementDetails.movements.outflow.length === 0 ? (
+                    <div className="no-data-message">No outflow found in selected period</div>
+                  ) : (
+                    netMovementDetails.movements.outflow.map((item) => (
+                      <div key={`${item.type}-${item.id}`} className="movement-item outflow">
+                        <div className="movement-icon">
+                          🚚
+                        </div>
+                        <div className="movement-content">
+                          <div className="movement-title">
+                            <strong>{item.title}</strong>
+                            <span className={`status-badge ${getStatusBadgeClass(item.status)}`}>
+                              {item.status}
+                            </span>
+                          </div>
+                          <div className="movement-details-small">
+                            <span>👤 {item.user}</span>
+                            <span>🏢 {item.department}</span>
+                            <span>📦 Qty: {item.quantity}</span>
+                            <span>📅 {formatDate(item.date)}</span>
+                          </div>
+                          {item.details.reason && (
+                            <div className="movement-reason">
+                              <small>Reason: {item.details.reason}</small>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -44,11 +44,18 @@ export const authService = {
   getProfile: () => api.get('/auth/me'),
 };
 
+// User/Personnel services
+export const userService = {
+  searchUsers: (params) => api.get('/auth/users/search', { params }),
+  getAllUsers: () => api.get('/auth/users'),
+};
+
 // Dashboard services
 export const dashboardService = {
   getMetrics: (params) => api.get('/dashboard/metrics', { params }),
   getDepartmentSummary: (params) => api.get('/dashboard/departments', { params }),
   getRecentActivities: (params) => api.get('/dashboard/activities', { params }),
+  getNetMovementDetails: (params) => api.get('/dashboard/net-movement', { params }),
 };
 
 // Transfer services
@@ -87,6 +94,7 @@ export const expenditureService = {
 export const purchaseService = {
   createPurchase: (data) => api.post('/purchases', data),
   getAllPurchases: (params) => api.get('/purchases', { params }),
+  getAvailableEquipment: (params) => api.get('/purchases/available-equipment', { params }),
   getPurchaseById: (id) => api.get(`/purchases/${id}`),
   updatePurchase: (id, data) => api.put(`/purchases/${id}`, data),
   deletePurchase: (id) => api.delete(`/purchases/${id}`),

@@ -1,15 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const dashboardController = require('../controllers/dashboard.controller');
+const {
+  getDashboardMetrics,
+  getDepartmentSummary,
+  getRecentActivities,
+  getNetMovementDetails
+} = require('../controllers/dashboard.controller');
 const { protect } = require('../middleware/auth.middleware');
 
-// Get dashboard metrics
-router.get('/metrics', protect, dashboardController.getDashboardMetrics);
+// Protected routes
+router.use(protect);
 
-// Get department summary
-router.get('/departments', protect, dashboardController.getDepartmentSummary);
-
-// Get recent activities
-router.get('/activities', protect, dashboardController.getRecentActivities);
+// Dashboard routes
+router.get('/metrics', getDashboardMetrics);
+router.get('/departments', getDepartmentSummary);
+router.get('/activities', getRecentActivities);
+router.get('/net-movement', getNetMovementDetails);
 
 module.exports = router; 
