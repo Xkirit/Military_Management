@@ -16,10 +16,7 @@ const Assignments = () => {
   const fetchAssignments = async () => {
     try {
       setLoading(true);
-      const response = await assignmentService.getAllAssignments({
-        search: searchTerm,
-        status: statusFilter
-      });
+      const response = await assignmentService.getAllAssignments();
       setAssignments(response.data);
     } catch (error) {
       console.error('Error fetching assignments:', error);
@@ -31,7 +28,24 @@ const Assignments = () => {
 
   useEffect(() => {
     fetchAssignments();
-  }, [searchTerm, statusFilter]);
+  }, []);
+
+  // Filter assignments based on search and status
+  const filteredAssignments = assignments.filter(assignment => {
+    const personnelName = assignment.personnel ? 
+      `${assignment.personnel.firstName || ''} ${assignment.personnel.lastName || ''}`.trim() : 
+      'N/A';
+    
+    const matchesSearch = !searchTerm || 
+      personnelName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      assignment.assignment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      assignment.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      assignment.unit?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = !statusFilter || assignment.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
 
   // Handle create assignment click
   const handleCreateClick = () => {
@@ -68,7 +82,7 @@ const Assignments = () => {
   // Handle status update
   const handleStatusUpdate = async (id, newStatus) => {
     try {
-      await assignmentService.updateStatus(id, newStatus);
+      await assignmentService.updateStatus(id, { status: newStatus });
       toast.success('Assignment status updated successfully');
       fetchAssignments(); // Refresh the list
     } catch (error) {
@@ -136,38 +150,49 @@ const Assignments = () => {
                 <th>ID</th>
                 <th>Personnel</th>
                 <th>Rank</th>
-                <th>Unit</th>
                 <th>Assignment</th>
+                <th>Unit</th>
                 <th>Location</th>
                 <th>Start Date</th>
                 <th>End Date</th>
+                <th>Priority</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {assignments.length === 0 ? (
+              {filteredAssignments.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="no-data-message">
+                  <td colSpan="11" className="no-data-message">
                     No assignments found
                   </td>
                 </tr>
               ) : (
-                assignments.map((assignment) => (
+                filteredAssignments.map((assignment) => (
                   <tr key={assignment._id || assignment.id}>
-                    <td>{assignment._id || assignment.id}</td>
-                    <td>{assignment.personnel}</td>
-                    <td>{assignment.rank}</td>
-                    <td>{assignment.unit}</td>
+                    <td>{assignment._id?.slice(-6) || assignment.id}</td>
+                    <td>
+                      {assignment.personnel 
+                        ? `${assignment.personnel.firstName || ''} ${assignment.personnel.lastName || ''}`.trim()
+                        : 'N/A'
+                      }
+                    </td>
+                    <td>{assignment.personnel?.rank || 'N/A'}</td>
                     <td>{assignment.assignment}</td>
+                    <td>{assignment.unit}</td>
                     <td>{assignment.location}</td>
                     <td>{new Date(assignment.startDate).toLocaleDateString()}</td>
                     <td>{new Date(assignment.endDate).toLocaleDateString()}</td>
                     <td>
+                      <span className={`priority-badge ${assignment.priority?.toLowerCase()}`}>
+                        {assignment.priority}
+                      </span>
+                    </td>
+                    <td>
                       <select
                         className={`status-select ${assignment.status.toLowerCase()}`}
                         value={assignment.status}
-                        onChange={(e) => handleStatusUpdate(assignment._id, e.target.value)}
+                        onChange={(e) => handleStatusUpdate(assignment._id || assignment.id, e.target.value)}
                       >
                         <option value="Active">Active</option>
                         <option value="Completed">Completed</option>
@@ -179,7 +204,7 @@ const Assignments = () => {
                       <div className="action-buttons">
                         <button 
                           className="action-button view"
-                          onClick={() => handleViewClick(assignment._id)}
+                          onClick={() => handleViewClick(assignment._id || assignment.id)}
                         >
                           View
                         </button>
@@ -191,7 +216,7 @@ const Assignments = () => {
                         </button>
                         <button 
                           className="action-button delete"
-                          onClick={() => handleDelete(assignment._id)}
+                          onClick={() => handleDelete(assignment._id || assignment.id)}
                         >
                           Delete
                         </button>

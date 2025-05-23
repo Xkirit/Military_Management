@@ -44,6 +44,13 @@ export const authService = {
   getProfile: () => api.get('/auth/me'),
 };
 
+// Dashboard services
+export const dashboardService = {
+  getMetrics: (params) => api.get('/dashboard/metrics', { params }),
+  getDepartmentSummary: (params) => api.get('/dashboard/departments', { params }),
+  getRecentActivities: (params) => api.get('/dashboard/activities', { params }),
+};
+
 // Transfer services
 export const transferService = {
   createTransfer: (data) => api.post('/transfers', data),

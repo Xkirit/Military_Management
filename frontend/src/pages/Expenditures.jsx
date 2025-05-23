@@ -17,11 +17,7 @@ const Expenditures = () => {
   const fetchExpenditures = async () => {
     try {
       setLoading(true);
-      const response = await expenditureService.getAllExpenditures({
-        search: searchTerm,
-        category: categoryFilter,
-        status: statusFilter
-      });
+      const response = await expenditureService.getAllExpenditures();
       setExpenditures(response.data);
     } catch (error) {
       console.error('Error fetching expenditures:', error);
@@ -33,7 +29,21 @@ const Expenditures = () => {
 
   useEffect(() => {
     fetchExpenditures();
-  }, [searchTerm, categoryFilter, statusFilter]);
+  }, []);
+
+  // Filter expenditures based on search, category, and status
+  const filteredExpenditures = expenditures.filter(expenditure => {
+    const matchesSearch = !searchTerm || 
+      expenditure.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expenditure.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expenditure.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expenditure.receiptNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCategory = !categoryFilter || expenditure.category === categoryFilter;
+    const matchesStatus = !statusFilter || expenditure.status === statusFilter;
+    
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
 
   // Handle record expenditure click
   const handleRecordClick = () => {
@@ -64,6 +74,18 @@ const Expenditures = () => {
         console.error('Error deleting expenditure:', error);
         toast.error('Failed to delete expenditure');
       }
+    }
+  };
+
+  // Handle status update
+  const handleStatusUpdate = async (id, newStatus) => {
+    try {
+      await expenditureService.updateStatus(id, { status: newStatus });
+      toast.success('Expenditure status updated successfully');
+      fetchExpenditures(); // Refresh the list
+    } catch (error) {
+      console.error('Error updating expenditure status:', error);
+      toast.error('Failed to update expenditure status');
     }
   };
 
@@ -114,7 +136,8 @@ const Expenditures = () => {
           <option value="Maintenance">Maintenance</option>
           <option value="Operations">Operations</option>
           <option value="Personnel">Personnel</option>
-          <option value="Supplies">Supplies</option>
+          <option value="Medical">Medical</option>
+          <option value="Other">Other</option>
         </select>
         <select
           className="filter-select"
@@ -122,10 +145,11 @@ const Expenditures = () => {
           onChange={(e) => setStatusFilter(e.target.value)}
         >
           <option value="">All Status</option>
-          <option value="Approved">Approved</option>
           <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
           <option value="Processing">Processing</option>
           <option value="Completed">Completed</option>
+          <option value="Rejected">Rejected</option>
         </select>
       </div>
 
@@ -140,38 +164,50 @@ const Expenditures = () => {
                 <th>Category</th>
                 <th>Description</th>
                 <th>Amount</th>
-                <th>Date</th>
                 <th>Department</th>
+                <th>Budget Year</th>
+                <th>Quarter</th>
+                <th>Payment Method</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {expenditures.length === 0 ? (
+              {filteredExpenditures.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="no-data-message">
+                  <td colSpan="10" className="no-data-message">
                     No expenditures found
                   </td>
                 </tr>
               ) : (
-                expenditures.map((expenditure) => (
+                filteredExpenditures.map((expenditure) => (
                   <tr key={expenditure._id || expenditure.id}>
-                    <td>{expenditure._id || expenditure.id}</td>
+                    <td>{expenditure._id?.slice(-6) || expenditure.id}</td>
                     <td>{expenditure.category}</td>
                     <td>{expenditure.description}</td>
-                    <td>${expenditure.amount.toLocaleString()}</td>
-                    <td>{new Date(expenditure.date).toLocaleDateString()}</td>
+                    <td>${expenditure.amount?.toLocaleString() || '0'}</td>
                     <td>{expenditure.department}</td>
+                    <td>{expenditure.budgetYear}</td>
+                    <td>Q{expenditure.quarter}</td>
+                    <td>{expenditure.paymentMethod}</td>
                     <td>
-                      <span className={`status-badge ${expenditure.status.toLowerCase()}`}>
-                        {expenditure.status}
-                      </span>
+                      <select
+                        className={`status-select ${expenditure.status.toLowerCase()}`}
+                        value={expenditure.status}
+                        onChange={(e) => handleStatusUpdate(expenditure._id || expenditure.id, e.target.value)}
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
                     </td>
                     <td>
                       <div className="action-buttons">
                         <button 
                           className="action-button view"
-                          onClick={() => handleViewClick(expenditure._id)}
+                          onClick={() => handleViewClick(expenditure._id || expenditure.id)}
                         >
                           View
                         </button>
@@ -183,7 +219,7 @@ const Expenditures = () => {
                         </button>
                         <button 
                           className="action-button delete"
-                          onClick={() => handleDelete(expenditure._id)}
+                          onClick={() => handleDelete(expenditure._id || expenditure.id)}
                         >
                           Delete
                         </button>
