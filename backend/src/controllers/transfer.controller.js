@@ -23,26 +23,37 @@ exports.createTransfer = async (req, res) => {
 exports.getAllTransfers = async (req, res) => {
   try {
     const userBase = req.user.base; // Get user's base from authenticated user
+    const userRole = req.user.role;
     
-    console.log(`Fetching transfers for ${userBase} - showing inflow and outflow`);
+    console.log(`Transfer Debug - User: ${userRole} from ${userBase}`);
     
-    // Show transfers where user's base is either source OR destination
-    const baseTransferQuery = {
-      $or: [
-        { sourceBaseId: userBase },      // Outgoing transfers (from user's base)
-        { destinationBaseId: userBase }  // Incoming transfers (to user's base)
-      ]
-    };
+    let baseTransferQuery;
+    
+    if (userRole === 'Admin') {
+      // Admin sees ALL transfers from all bases
+      console.log('Transfer Debug - Admin user, fetching all transfers');
+      baseTransferQuery = {}; // No base restriction
+    } else {
+      // Base Commander and Logistics Officer see transfers involving their base
+      console.log(`Transfer Debug - ${userRole} user, fetching transfers for base: ${userBase}`);
+      baseTransferQuery = {
+        $or: [
+          { sourceBaseId: userBase },      // Outgoing transfers (from user's base)
+          { destinationBaseId: userBase }  // Incoming transfers (to user's base)
+        ]
+      };
+    }
     
     const transfers = await Transfer.find(baseTransferQuery)
-      .populate('requestedBy', 'firstName lastName role')
-      .populate('approvedBy', 'firstName lastName role')
+      .populate('requestedBy', 'firstName lastName role base')
+      .populate('approvedBy', 'firstName lastName role base')
       .sort({ createdAt: -1 });
     
-    console.log(`Found ${transfers.length} transfers for ${userBase}`);
+    console.log(`Transfer Debug - Found ${transfers.length} transfers`);
     
     res.status(200).json(transfers);
   } catch (error) {
+    console.error('Transfer Debug - Error:', error);
     res.status(500).json({
       message: 'Error fetching transfers',
       error: error.message

@@ -24,14 +24,38 @@ exports.createAssignment = async (req, res) => {
 // Get all assignments
 exports.getAllAssignments = async (req, res) => {
   try {
-    const assignments = await Assignment.find()
-      .populate('personnel', 'firstName lastName rank department')
-      .populate('assignedBy', 'firstName lastName rank')
+    const userRole = req.user.role;
+    const userBase = req.user.base;
+    
+    console.log(`Assignment Debug - User: ${userRole} from ${userBase}`);
+    
+    let filter = {};
+    
+    if (userRole === 'Admin') {
+      // Admin sees ALL assignments from all bases
+      console.log('Assignment Debug - Admin user, fetching all assignments');
+      filter = {}; // No base restriction
+    } else {
+      // Base Commander and Logistics Officer see only assignments from their base
+      console.log(`Assignment Debug - ${userRole} user, fetching assignments for base: ${userBase}`);
+      const User = require('../models/user.model');
+      const baseUserIds = await User.find({ base: userBase }).select('_id');
+      filter = { assignedBy: { $in: baseUserIds.map(user => user._id) } };
+    }
+    
+    console.log('Assignment Debug - Filter applied:', filter);
+    
+    const assignments = await Assignment.find(filter)
+      .populate('personnel', 'firstName lastName rank department base')
+      .populate('assignedBy', 'firstName lastName rank base')
       .populate('equipmentPurchase', 'item category unitPrice')
       .sort({ createdAt: -1 });
     
+    console.log(`Assignment Debug - Found ${assignments.length} assignments`);
+    
     res.status(200).json(assignments);
   } catch (error) {
+    console.error('Assignment Debug - Error:', error);
     res.status(500).json({
       message: 'Error fetching assignments',
       error: error.message

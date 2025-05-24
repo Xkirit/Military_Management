@@ -5,6 +5,17 @@ exports.getAllPurchases = async (req, res) => {
     const { category, status, startDate, endDate } = req.query;
     const filter = {};
 
+    // Role-based filtering
+    if (req.user.role === 'Admin') {
+      // Admin can see all purchases from all bases
+      console.log('Purchase Debug - Admin user, showing all purchases');
+    } else {
+      // Base Commander and Logistics Officer can only see purchases from their base
+      const baseUserIds = await require('../models/user.model').find({ base: req.user.base }).select('_id');
+      filter.requestedBy = { $in: baseUserIds.map(user => user._id) };
+      console.log(`Purchase Debug - ${req.user.role} user from ${req.user.base}, filtering purchases`);
+    }
+
     if (category) filter.category = category;
     if (status) filter.status = status;
     if (startDate || endDate) {
@@ -13,13 +24,17 @@ exports.getAllPurchases = async (req, res) => {
       if (endDate) filter.createdAt.$lte = new Date(endDate);
     }
 
+    console.log('Purchase Debug - Filter applied:', filter);
+
     const purchases = await Purchase.find(filter)
-      .populate('requestedBy', 'firstName lastName department')
+      .populate('requestedBy', 'firstName lastName department base')
       .populate('approvedBy', 'firstName lastName')
       .sort({ createdAt: -1 });
 
+    console.log(`Purchase Debug - Found ${purchases.length} purchases`);
     res.json(purchases);
   } catch (error) {
+    console.error('Purchase Debug - Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

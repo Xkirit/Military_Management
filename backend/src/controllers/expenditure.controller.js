@@ -23,9 +23,26 @@ exports.createExpenditure = async (req, res) => {
 exports.getAllExpenditures = async (req, res) => {
   try {
     const { department, category, startDate, endDate } = req.query;
+    const userRole = req.user.role;
+    const userBase = req.user.base;
+    
+    console.log(`Expenditure Debug - User: ${userRole} from ${userBase}`);
+    
     let query = {};
 
-    // Apply filters if provided
+    // Role-based filtering
+    if (userRole === 'Admin') {
+      // Admin sees ALL expenditures from all bases
+      console.log('Expenditure Debug - Admin user, fetching all expenditures');
+    } else {
+      // Base Commander and Logistics Officer see only expenditures from their base
+      console.log(`Expenditure Debug - ${userRole} user, fetching expenditures for base: ${userBase}`);
+      const User = require('../models/user.model');
+      const baseUserIds = await User.find({ base: userBase }).select('_id');
+      query.requestedBy = { $in: baseUserIds.map(user => user._id) };
+    }
+
+    // Apply additional filters if provided
     if (department) query.department = department;
     if (category) query.category = category;
     if (startDate || endDate) {
@@ -34,12 +51,17 @@ exports.getAllExpenditures = async (req, res) => {
       if (endDate) query.createdAt.$lte = new Date(endDate);
     }
 
+    console.log('Expenditure Debug - Filter applied:', query);
+
     const expenditures = await Expenditure.find(query)
-      .populate('requestedBy', 'firstName lastName role')
+      .populate('requestedBy', 'firstName lastName role base')
       .sort({ createdAt: -1 });
+    
+    console.log(`Expenditure Debug - Found ${expenditures.length} expenditures`);
     
     res.status(200).json(expenditures);
   } catch (error) {
+    console.error('Expenditure Debug - Error:', error);
     res.status(500).json({
       message: 'Error fetching expenditures',
       error: error.message

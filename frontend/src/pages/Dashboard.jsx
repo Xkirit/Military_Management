@@ -278,9 +278,6 @@ const Dashboard = () => {
         </>
       )}
 
-      {/* Debug Info for Modal */}
-      {console.log('Dashboard Debug - showNetMovement:', showNetMovement, 'netMovementDetails:', netMovementDetails)}
-
       {/* Net Movement Details Modal */}
       {showNetMovement && netMovementDetails && (
         <div className="modal-overlay">

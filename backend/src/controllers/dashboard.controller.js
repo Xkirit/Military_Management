@@ -9,16 +9,29 @@ exports.getMetrics = async (req, res) => {
     const { base, role } = req.user;
     const userBase = base;
 
-    const baseUserIds = await User.find({ base: userBase }).select('_id');
-    const userIds = baseUserIds.map(user => user._id);
+    console.log(`Dashboard Debug - User: ${role} from ${userBase}`);
 
-    const baseQuery = { requestedBy: { $in: userIds } };
-    const transferQuery = role === 'Admin' ? {} : {
-      $or: [
-        { sourceBaseId: userBase },
-        { destinationBaseId: userBase }
-      ]
-    };
+    let baseQuery, transferQuery, userIds;
+
+    if (role === 'Admin') {
+      // Admin sees data from ALL bases
+      console.log('Dashboard Debug - Admin user, fetching data from all bases');
+      baseQuery = {}; // No base restriction
+      transferQuery = {}; // No base restriction for transfers
+      userIds = await User.find({}).select('_id');
+    } else {
+      // Base Commander and Logistics Officer see only their base data
+      console.log(`Dashboard Debug - ${role} user, fetching data from base: ${userBase}`);
+      const baseUserIds = await User.find({ base: userBase }).select('_id');
+      userIds = baseUserIds;
+      baseQuery = { requestedBy: { $in: baseUserIds.map(user => user._id) } };
+      transferQuery = {
+        $or: [
+          { sourceBaseId: userBase },
+          { destinationBaseId: userBase }
+        ]
+      };
+    }
 
     const [
       assignments,
@@ -31,86 +44,170 @@ exports.getMetrics = async (req, res) => {
     ] = await Promise.all([
       Assignment.find(baseQuery).populate('personnel'),
       Expenditure.find(baseQuery),
-      Transfer.aggregate([
-        { $match: { sourceBaseId: userBase } },
-        {
-          $lookup: {
-            from: 'purchases',
-            localField: 'equipment',
-            foreignField: 'item',
-            as: 'equipmentData'
-          }
-        },
-        {
-          $addFields: {
-            unitPrice: {
-              $cond: {
-                if: { $gt: [{ $size: '$equipmentData' }, 0] },
-                then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
-                else: 0
-              }
-            },
-            totalValue: {
-              $multiply: [
-                '$quantity',
-                {
-                  $cond: {
-                    if: { $gt: [{ $size: '$equipmentData' }, 0] },
-                    then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
-                    else: 0
-                  }
+      role === 'Admin' ? 
+        Transfer.aggregate([
+          { $match: {} },
+          {
+            $lookup: {
+              from: 'purchases',
+              localField: 'equipment',
+              foreignField: 'item',
+              as: 'equipmentData'
+            }
+          },
+          {
+            $addFields: {
+              unitPrice: {
+                $cond: {
+                  if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                  then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                  else: 0
                 }
-              ]
+              },
+              totalValue: {
+                $multiply: [
+                  '$quantity',
+                  {
+                    $cond: {
+                      if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                      then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                      else: 0
+                    }
+                  }
+                ]
+              }
             }
           }
-        }
-      ]),
-      Transfer.aggregate([
-        { $match: { destinationBaseId: userBase } },
-        {
-          $lookup: {
-            from: 'purchases',
-            localField: 'equipment',
-            foreignField: 'item',
-            as: 'equipmentData'
-          }
-        },
-        {
-          $addFields: {
-            unitPrice: {
-              $cond: {
-                if: { $gt: [{ $size: '$equipmentData' }, 0] },
-                then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
-                else: 0
-              }
-            },
-            totalValue: {
-              $multiply: [
-                '$quantity',
-                {
-                  $cond: {
-                    if: { $gt: [{ $size: '$equipmentData' }, 0] },
-                    then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
-                    else: 0
-                  }
+        ]) :
+        Transfer.aggregate([
+          { $match: { sourceBaseId: userBase } },
+          {
+            $lookup: {
+              from: 'purchases',
+              localField: 'equipment',
+              foreignField: 'item',
+              as: 'equipmentData'
+            }
+          },
+          {
+            $addFields: {
+              unitPrice: {
+                $cond: {
+                  if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                  then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                  else: 0
                 }
-              ]
+              },
+              totalValue: {
+                $multiply: [
+                  '$quantity',
+                  {
+                    $cond: {
+                      if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                      then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                      else: 0
+                    }
+                  }
+                ]
+              }
             }
           }
-        }
-      ]),
+        ]),
+      role === 'Admin' ?
+        Transfer.aggregate([
+          { $match: {} },
+          {
+            $lookup: {
+              from: 'purchases',
+              localField: 'equipment',
+              foreignField: 'item',
+              as: 'equipmentData'
+            }
+          },
+          {
+            $addFields: {
+              unitPrice: {
+                $cond: {
+                  if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                  then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                  else: 0
+                }
+              },
+              totalValue: {
+                $multiply: [
+                  '$quantity',
+                  {
+                    $cond: {
+                      if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                      then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                      else: 0
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]) :
+        Transfer.aggregate([
+          { $match: { destinationBaseId: userBase } },
+          {
+            $lookup: {
+              from: 'purchases',
+              localField: 'equipment',
+              foreignField: 'item',
+              as: 'equipmentData'
+            }
+          },
+          {
+            $addFields: {
+              unitPrice: {
+                $cond: {
+                  if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                  then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                  else: 0
+                }
+              },
+              totalValue: {
+                $multiply: [
+                  '$quantity',
+                  {
+                    $cond: {
+                      if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                      then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                      else: 0
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]),
       Purchase.find(baseQuery),
-      User.countDocuments({ base: userBase }),
-      User.aggregate([
-        { $match: { base: userBase } },
-        { $group: { _id: '$department', count: { $sum: 1 } } }
-      ])
+      role === 'Admin' ? User.countDocuments({}) : User.countDocuments({ base: userBase }),
+      role === 'Admin' ? 
+        User.aggregate([
+          { $group: { _id: '$department', count: { $sum: 1 } } }
+        ]) :
+        User.aggregate([
+          { $match: { base: userBase } },
+          { $group: { _id: '$department', count: { $sum: 1 } } }
+        ])
     ]);
 
     // Calculate net movement values for the base
     const totalOutflowValue = transfersOut.reduce((sum, transfer) => sum + (transfer.totalValue || 0), 0);
     const totalInflowValue = transfersIn.reduce((sum, transfer) => sum + (transfer.totalValue || 0), 0);
-    const netBalance = totalInflowValue - totalOutflowValue;
+    
+    // Include purchases as inflow (materials coming into the system)
+    const purchaseInflowValue = purchases.reduce((sum, purchase) => {
+      return sum + (purchase.quantity * purchase.unitPrice);
+    }, 0);
+    
+    // Total inflow = transfers coming in + purchases
+    const totalSystemInflowValue = totalInflowValue + purchaseInflowValue;
+    const netBalance = totalSystemInflowValue - totalOutflowValue;
+
+    console.log(`Dashboard Debug - Transfer inflow: $${totalInflowValue}, Purchase inflow: $${purchaseInflowValue}, Transfer outflow: $${totalOutflowValue}, Net balance: $${netBalance}`);
 
     const totalExpenditures = purchases.reduce((sum, purchase) => {
       return sum + (purchase.quantity * purchase.unitPrice);
@@ -134,7 +231,7 @@ exports.getMetrics = async (req, res) => {
         dateRange: { start: null, end: null }
       },
       netMovement: {
-        flowingIn: totalInflowValue,
+        flowingIn: totalSystemInflowValue,
         flowingOut: totalOutflowValue,
         netBalance
       },
@@ -308,15 +405,34 @@ exports.getRecentActivities = async (req, res) => {
 
 exports.getNetMovementDetails = async (req, res) => {
   try {
-    const { base } = req.user;
+    const { base, role } = req.user;
     const userBase = base;
+    
+    console.log(`NetMovement Debug - User: ${role} from ${userBase}`);
 
-    const baseUserIds = await User.find({ base: userBase }).select('_id');
-    const userIds = baseUserIds.map(user => user._id);
+    let userIds, purchaseQuery, transferQuery;
+
+    if (role === 'Admin') {
+      // Admin sees net movement details from ALL bases
+      console.log('NetMovement Debug - Admin user, fetching data from all bases');
+      userIds = await User.find({}).select('_id');
+      purchaseQuery = {};
+      transferQuery = {};
+    } else {
+      // Base Commander and Logistics Officer see only their base data
+      console.log(`NetMovement Debug - ${role} user, fetching data for base: ${userBase}`);
+      const baseUserIds = await User.find({ base: userBase }).select('_id');
+      userIds = baseUserIds;
+      purchaseQuery = { requestedBy: { $in: baseUserIds.map(user => user._id) } };
+      transferQuery = { $or: [{ sourceBaseId: userBase }, { destinationBaseId: userBase }] };
+    }
+
+    console.log('NetMovement Debug - Purchase filter:', purchaseQuery);
+    console.log('NetMovement Debug - Transfer filter:', transferQuery);
 
     const [purchases, transfersOut, transfersIn] = await Promise.all([
       Purchase.aggregate([
-        { $match: { requestedBy: { $in: userIds } } },
+        { $match: purchaseQuery },
         {
           $lookup: {
             from: 'users',
@@ -331,90 +447,176 @@ exports.getNetMovementDetails = async (req, res) => {
           }
         }
       ]),
-      Transfer.aggregate([
-        { $match: { sourceBaseId: userBase } },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'requestedBy',
-            foreignField: '_id',
-            as: 'user'
-          }
-        },
-        {
-          $lookup: {
-            from: 'purchases',
-            localField: 'equipment',
-            foreignField: 'item',
-            as: 'equipmentData'
-          }
-        },
-        {
-          $addFields: {
-            unitPrice: {
-              $cond: {
-                if: { $gt: [{ $size: '$equipmentData' }, 0] },
-                then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
-                else: 0
-              }
-            },
-            totalValue: {
-              $multiply: [
-                '$quantity',
-                {
-                  $cond: {
-                    if: { $gt: [{ $size: '$equipmentData' }, 0] },
-                    then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
-                    else: 0
-                  }
+      role === 'Admin' ?
+        Transfer.aggregate([
+          { $match: {} }, // Admin sees all outgoing transfers
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'requestedBy',
+              foreignField: '_id',
+              as: 'user'
+            }
+          },
+          {
+            $lookup: {
+              from: 'purchases',
+              localField: 'equipment',
+              foreignField: 'item',
+              as: 'equipmentData'
+            }
+          },
+          {
+            $addFields: {
+              unitPrice: {
+                $cond: {
+                  if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                  then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                  else: 0
                 }
-              ]
+              },
+              totalValue: {
+                $multiply: [
+                  '$quantity',
+                  {
+                    $cond: {
+                      if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                      then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                      else: 0
+                    }
+                  }
+                ]
+              }
             }
           }
-        }
-      ]),
-      Transfer.aggregate([
-        { $match: { destinationBaseId: userBase } },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'requestedBy',
-            foreignField: '_id',
-            as: 'user'
-          }
-        },
-        {
-          $lookup: {
-            from: 'purchases',
-            localField: 'equipment',
-            foreignField: 'item',
-            as: 'equipmentData'
-          }
-        },
-        {
-          $addFields: {
-            unitPrice: {
-              $cond: {
-                if: { $gt: [{ $size: '$equipmentData' }, 0] },
-                then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
-                else: 0
-              }
-            },
-            totalValue: {
-              $multiply: [
-                '$quantity',
-                {
-                  $cond: {
-                    if: { $gt: [{ $size: '$equipmentData' }, 0] },
-                    then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
-                    else: 0
-                  }
+        ]) :
+        Transfer.aggregate([
+          { $match: { sourceBaseId: userBase } },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'requestedBy',
+              foreignField: '_id',
+              as: 'user'
+            }
+          },
+          {
+            $lookup: {
+              from: 'purchases',
+              localField: 'equipment',
+              foreignField: 'item',
+              as: 'equipmentData'
+            }
+          },
+          {
+            $addFields: {
+              unitPrice: {
+                $cond: {
+                  if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                  then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                  else: 0
                 }
-              ]
+              },
+              totalValue: {
+                $multiply: [
+                  '$quantity',
+                  {
+                    $cond: {
+                      if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                      then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                      else: 0
+                    }
+                  }
+                ]
+              }
             }
           }
-        }
-      ])
+        ]),
+      role === 'Admin' ?
+        Transfer.aggregate([
+          { $match: {} }, // Admin sees all incoming transfers
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'requestedBy',
+              foreignField: '_id',
+              as: 'user'
+            }
+          },
+          {
+            $lookup: {
+              from: 'purchases',
+              localField: 'equipment',
+              foreignField: 'item',
+              as: 'equipmentData'
+            }
+          },
+          {
+            $addFields: {
+              unitPrice: {
+                $cond: {
+                  if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                  then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                  else: 0
+                }
+              },
+              totalValue: {
+                $multiply: [
+                  '$quantity',
+                  {
+                    $cond: {
+                      if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                      then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                      else: 0
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]) :
+        Transfer.aggregate([
+          { $match: { destinationBaseId: userBase } },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'requestedBy',
+              foreignField: '_id',
+              as: 'user'
+            }
+          },
+          {
+            $lookup: {
+              from: 'purchases',
+              localField: 'equipment',
+              foreignField: 'item',
+              as: 'equipmentData'
+            }
+          },
+          {
+            $addFields: {
+              unitPrice: {
+                $cond: {
+                  if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                  then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                  else: 0
+                }
+              },
+              totalValue: {
+                $multiply: [
+                  '$quantity',
+                  {
+                    $cond: {
+                      if: { $gt: [{ $size: '$equipmentData' }, 0] },
+                      then: { $arrayElemAt: ['$equipmentData.unitPrice', 0] },
+                      else: 0
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ])
     ]);
 
     const inflow = [
@@ -469,8 +671,10 @@ exports.getNetMovementDetails = async (req, res) => {
     const inflowValue = inflow.reduce((sum, item) => sum + item.amount, 0);
     const outflowValue = outflow.reduce((sum, item) => sum + item.amount, 0);
 
+    console.log(`NetMovement Debug - Found ${purchases.length} purchases, ${transfersOut.length} outbound transfers, ${transfersIn.length} inbound transfers`);
+
     res.status(200).json({
-      base: userBase,
+      base: role === 'Admin' ? 'All Bases' : userBase,
       summary: {
         inflowTotal,
         outflowTotal,
