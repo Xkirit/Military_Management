@@ -5,7 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "build": "npm install && npm install -g nodemon && npm install -g bcryptjs && npm install -g jsonwebtoken && npm install -g mongoose"
   },
   "keywords": [],
   "author": "",
