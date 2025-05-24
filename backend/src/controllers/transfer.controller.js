@@ -22,10 +22,24 @@ exports.createTransfer = async (req, res) => {
 // Get all transfers
 exports.getAllTransfers = async (req, res) => {
   try {
-    const transfers = await Transfer.find()
-      .populate('requestedBy', 'firstName lastName rank')
-      .populate('approvedBy', 'firstName lastName rank')
+    const userBase = req.user.base; // Get user's base from authenticated user
+    
+    console.log(`Fetching transfers for ${userBase} - showing inflow and outflow`);
+    
+    // Show transfers where user's base is either source OR destination
+    const baseTransferQuery = {
+      $or: [
+        { sourceBaseId: userBase },      // Outgoing transfers (from user's base)
+        { destinationBaseId: userBase }  // Incoming transfers (to user's base)
+      ]
+    };
+    
+    const transfers = await Transfer.find(baseTransferQuery)
+      .populate('requestedBy', 'firstName lastName role')
+      .populate('approvedBy', 'firstName lastName role')
       .sort({ createdAt: -1 });
+    
+    console.log(`Found ${transfers.length} transfers for ${userBase}`);
     
     res.status(200).json(transfers);
   } catch (error) {
@@ -119,17 +133,18 @@ exports.updateStatus = async (req, res) => {
       return res.status(404).json({ message: 'Transfer not found' });
     }
 
-    // Validate status transition
-    const validTransitions = {
-      'Pending': ['In Transit', 'Cancelled'],
-      'In Transit': ['Completed', 'Cancelled'],
-      'Completed': [],
-      'Cancelled': []
-    };
-
-    if (!validTransitions[transfer.status].includes(status)) {
+    // Allow most transitions except changing from Completed
+    if (transfer.status === 'Completed' && status !== 'Completed') {
       return res.status(400).json({ 
-        message: `Invalid status transition from ${transfer.status} to ${status}` 
+        message: 'Cannot change status of completed transfer' 
+      });
+    }
+
+    // Validate that status is one of the allowed values
+    const allowedStatuses = ['Pending', 'In Transit', 'Completed', 'Cancelled'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ 
+        message: `Invalid status: ${status}. Allowed statuses: ${allowedStatuses.join(', ')}` 
       });
     }
 

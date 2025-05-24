@@ -1,5 +1,4 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { api } from '../api';
 
 const initialState = {
   equipment: [],
@@ -17,8 +16,20 @@ const equipmentSlice = createSlice({
   name: 'equipment',
   initialState,
   reducers: {
+    setEquipment: (state, action) => {
+      state.equipment = action.payload;
+      state.loading = false;
+      state.error = null;
+    },
     setSelectedEquipment: (state, action) => {
       state.selectedEquipment = action.payload;
+    },
+    setLoading: (state, action) => {
+      state.loading = action.payload;
+    },
+    setError: (state, action) => {
+      state.error = action.payload;
+      state.loading = false;
     },
     updateFilters: (state, action) => {
       state.filters = {
@@ -33,58 +44,14 @@ const equipmentSlice = createSlice({
       return initialState;
     },
   },
-  extraReducers: (builder) => {
-    builder
-      // Get equipment
-      .addMatcher(
-        api.endpoints.getEquipment.matchPending,
-        (state) => {
-          state.loading = true;
-          state.error = null;
-        }
-      )
-      .addMatcher(
-        api.endpoints.getEquipment.matchFulfilled,
-        (state, { payload }) => {
-          state.loading = false;
-          state.equipment = payload;
-        }
-      )
-      .addMatcher(
-        api.endpoints.getEquipment.matchRejected,
-        (state, { error }) => {
-          state.loading = false;
-          state.error = error.message;
-        }
-      )
-      // Get equipment by ID
-      .addMatcher(
-        api.endpoints.getEquipmentById.matchPending,
-        (state) => {
-          state.loading = true;
-          state.error = null;
-        }
-      )
-      .addMatcher(
-        api.endpoints.getEquipmentById.matchFulfilled,
-        (state, { payload }) => {
-          state.loading = false;
-          state.selectedEquipment = payload;
-        }
-      )
-      .addMatcher(
-        api.endpoints.getEquipmentById.matchRejected,
-        (state, { error }) => {
-          state.loading = false;
-          state.error = error.message;
-        }
-      );
-  },
 });
 
 // Actions
 export const {
+  setEquipment,
   setSelectedEquipment,
+  setLoading,
+  setError,
   updateFilters,
   clearFilters,
   clearEquipmentState,

@@ -1,28 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const {
-  getPurchases,
-  getAvailableEquipment,
-  getPurchaseById,
-  createPurchase,
-  updatePurchase,
-  updatePurchaseStatus,
-  deletePurchase,
-  approvePurchase
+const { 
+  getAllPurchases, 
+  getAvailableEquipment, 
+  getPurchaseById, 
+  createPurchase, 
+  updatePurchase, 
+  updatePurchaseStatus, 
+  deletePurchase, 
+  approvePurchase 
 } = require('../controllers/purchase.controller');
 const { protect } = require('../middleware/auth.middleware');
+const { checkPermission } = require('../middleware/rbac.middleware');
 
-// Protected routes
-router.use(protect);
+router.get('/available-equipment', protect, getAvailableEquipment);
 
-// Purchase routes
-router.get('/', getPurchases);
-router.get('/available-equipment', getAvailableEquipment);
-router.get('/:id', getPurchaseById);
-router.post('/', createPurchase);
-router.put('/:id', updatePurchase);
+router.route('/')
+  .get(protect, getAllPurchases)
+  .post(protect, checkPermission('create_purchase'), createPurchase);
+
+router.route('/:id')
+  .get(protect, getPurchaseById)
+  .put(protect, checkPermission('update_own_purchase'), updatePurchase)
+  .delete(protect, checkPermission('delete_own_purchase'), deletePurchase);
+
 router.patch('/:id/status', updatePurchaseStatus);
-router.delete('/:id', deletePurchase);
-router.patch('/:id/approve', approvePurchase);
+router.patch('/:id/approve', protect, checkPermission('approve_purchase'), approvePurchase);
 
 module.exports = router; 

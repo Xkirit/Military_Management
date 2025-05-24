@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getDashboardMetrics,
+  getMetrics,
   getDepartmentSummary,
   getRecentActivities,
   getNetMovementDetails
@@ -12,7 +12,7 @@ const { protect } = require('../middleware/auth.middleware');
 router.use(protect);
 
 // Dashboard routes
-router.get('/metrics', getDashboardMetrics);
+router.get('/metrics', getMetrics);
 router.get('/departments', getDepartmentSummary);
 router.get('/activities', getRecentActivities);
 router.get('/net-movement', getNetMovementDetails);

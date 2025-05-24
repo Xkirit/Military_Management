@@ -39,7 +39,7 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
   useEffect(() => {
     if (editData?.personnel && typeof editData.personnel === 'object') {
       setSelectedPersonnel(editData.personnel);
-      setPersonnelSearch(`${editData.personnel.firstName} ${editData.personnel.lastName} (${editData.personnel.rank})`);
+      setPersonnelSearch(`${editData.personnel.firstName} ${editData.personnel.lastName} (${editData.personnel.role})`);
     }
   }, [editData]);
 
@@ -130,7 +130,7 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
   // Handle personnel selection
   const handlePersonnelSelect = (personnel) => {
     setSelectedPersonnel(personnel);
-    setPersonnelSearch(`${personnel.firstName} ${personnel.lastName} (${personnel.rank})`);
+    setPersonnelSearch(`${personnel.firstName} ${personnel.lastName} (${personnel.role})`);
     setFormData(prev => ({ ...prev, personnel: personnel._id }));
     setShowPersonnelDropdown(false);
     setSearchResults([]);
@@ -274,7 +274,7 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
                           {person.firstName} {person.lastName}
                         </div>
                         <div className="personnel-details">
-                          {person.rank} • {person.department} • {person.email}
+                          {person.role} • {person.department} • {person.email}
                         </div>
                       </div>
                     ))
@@ -287,7 +287,7 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
             {selectedPersonnel && (
               <div className="selected-personnel">
                 <strong>Selected:</strong> {selectedPersonnel.firstName} {selectedPersonnel.lastName} 
-                ({selectedPersonnel.rank}) - {selectedPersonnel.department}
+                ({selectedPersonnel.role}) - {selectedPersonnel.department}
               </div>
             )}
           </div>
@@ -327,26 +327,6 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
                 <option value="Medical">Medical</option>
               </select>
               {errors.unit && <span className="error-message">{errors.unit}</span>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="equipmentQuantity">Equipment Quantity*</label>
-              <input
-                type="number"
-                id="equipmentQuantity"
-                name="equipmentQuantity"
-                value={formData.equipmentQuantity}
-                onChange={handleChange}
-                min="1"
-                max={selectedEquipment?.quantityAvailable || 999}
-                className={errors.equipmentQuantity ? 'error' : ''}
-                disabled={loading}
-                placeholder="1"
-              />
-              {errors.equipmentQuantity && <span className="error-message">{errors.equipmentQuantity}</span>}
-              {selectedEquipment && (
-                <small>Maximum available: {selectedEquipment.quantityAvailable} units</small>
-              )}
             </div>
           </div>
 
@@ -429,6 +409,26 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
                 </div>
               )}
             </div>
+
+            {selectedEquipment && (
+              <div className="form-group">
+                <label htmlFor="equipmentQuantity">Equipment Quantity*</label>
+                <input
+                  type="number"
+                  id="equipmentQuantity"
+                  name="equipmentQuantity"
+                  value={formData.equipmentQuantity}
+                  onChange={handleChange}
+                  min="1"
+                  max={selectedEquipment?.quantityAvailable || 999}
+                  className={errors.equipmentQuantity ? 'error' : ''}
+                  disabled={loading}
+                  placeholder="1"
+                />
+                {errors.equipmentQuantity && <span className="error-message">{errors.equipmentQuantity}</span>}
+                <small>Maximum available: {selectedEquipment.quantityAvailable} units</small>
+              </div>
+            )}
           </div>
 
           <div className="form-actions">

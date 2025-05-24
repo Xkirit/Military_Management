@@ -21,7 +21,4 @@ router.put('/:id', protect, expenditureController.updateExpenditure);
 // Delete expenditure
 router.delete('/:id', protect, expenditureController.deleteExpenditure);
 
-// Update expenditure status
-router.patch('/:id/status', protect, expenditureController.updateStatus);
-
 module.exports = router; 

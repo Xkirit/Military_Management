@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/Login.css';
 import { toast } from 'react-toastify';
 
-const Login = ({ onLogin }) => {
+const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -56,14 +58,12 @@ const Login = ({ onLogin }) => {
       
       try {
         const response = await authService.login(formData);
-        const { token, ...userData } = response.data;
+        const { token, user } = response.data;
         
-        // Store token and user data
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(userData));
+        // Use AuthContext login method
+        login(user, token);
         
-        // Update auth state and redirect
-        console.log('Login successful');
+        // Navigate to dashboard
         navigate('/dashboard');
         toast.success('Login successful');
       } catch (error) {

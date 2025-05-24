@@ -49,7 +49,7 @@ const NotFound = () => {
   return (
     <div style={containerStyle}>
       <div style={contentStyle}>
-        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎯</div>
+        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>404</div>
         <h1 style={{ color: '#1a237e', marginBottom: '1rem' }}>404 - Page Not Found</h1>
         <p style={{ color: '#666', marginBottom: '2rem', fontSize: '1.1rem' }}>
           The page you're looking for doesn't exist or has been moved.

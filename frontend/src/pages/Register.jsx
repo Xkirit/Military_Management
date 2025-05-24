@@ -12,8 +12,9 @@ const Register = () => {
     firstName: '',
     lastName: '',
     email: '',
-    rank: '',
+    role: '',
     department: '',
+    base: '',
     password: '',
     confirmPassword: ''
   });
@@ -52,12 +53,16 @@ const Register = () => {
       newErrors.email = 'Email is invalid';
     }
     
-    if (!formData.rank.trim()) {
-      newErrors.rank = 'Rank is required';
+    if (!formData.role.trim()) {
+      newErrors.role = 'Role is required';
     }
     
     if (!formData.department.trim()) {
       newErrors.department = 'Department is required';
+    }
+    
+    if (!formData.base.trim()) {
+      newErrors.base = 'Base is required';
     }
     
     if (!formData.password) {
@@ -147,25 +152,20 @@ const Register = () => {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="rank">Rank</label>
+              <label htmlFor="role">Role</label>
               <select
-                id="rank"
-                name="rank"
-                value={formData.rank}
+                id="role"
+                name="role"
+                value={formData.role}
                 onChange={handleChange}
-                className={errors.rank ? 'error' : ''}
+                className={errors.role ? 'error' : ''}
               >
-                <option value="">Select Rank</option>
-                <option value="General">General</option>
-                <option value="Colonel">Colonel</option>
-                <option value="Major">Major</option>
-                <option value="Captain">Captain</option>
-                <option value="Lieutenant">Lieutenant</option>
-                <option value="Sergeant">Sergeant</option>
-                <option value="Corporal">Corporal</option>
-                <option value="Private">Private</option>
+                <option value="">Select Role</option>
+                <option value="Admin">Admin</option>
+                <option value="Base Commander">Base Commander</option>
+                <option value="Logistics Officer">Logistics Officer</option>
               </select>
-              {errors.rank && <span className="error-message">{errors.rank}</span>}
+              {errors.role && <span className="error-message">{errors.role}</span>}
             </div>
 
             <div className="form-group">
@@ -187,6 +187,25 @@ const Register = () => {
               </select>
               {errors.department && <span className="error-message">{errors.department}</span>}
             </div>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="base">Base</label>
+            <select
+              id="base"
+              name="base"
+              value={formData.base}
+              onChange={handleChange}
+              className={errors.base ? 'error' : ''}
+            >
+              <option value="">Select Base</option>
+              <option value="Base A">Base A</option>
+              <option value="Base B">Base B</option>
+              <option value="Base C">Base C</option>
+              <option value="Base D">Base D</option>
+              <option value="Headquarters">Headquarters</option>
+            </select>
+            {errors.base && <span className="error-message">{errors.base}</span>}
           </div>
 
           <div className="form-group">

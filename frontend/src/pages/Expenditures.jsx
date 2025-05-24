@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { expenditureService } from '../services/api';
 import ExpenditureForm from '../components/forms/ExpenditureForm';
+import { 
+  FaPlus, 
+  FaEye, 
+  FaEdit, 
+  FaTrash,
+  FaCalendarAlt
+} from 'react-icons/fa';
 import '../styles/Table.css';
 
 const Expenditures = () => {
@@ -9,7 +16,6 @@ const Expenditures = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editData, setEditData] = useState(null);
 
@@ -17,7 +23,10 @@ const Expenditures = () => {
   const fetchExpenditures = async () => {
     try {
       setLoading(true);
-      const response = await expenditureService.getAllExpenditures();
+      const response = await expenditureService.getAllExpenditures({
+        search: searchTerm,
+        category: categoryFilter
+      });
       setExpenditures(response.data);
     } catch (error) {
       console.error('Error fetching expenditures:', error);
@@ -29,20 +38,20 @@ const Expenditures = () => {
 
   useEffect(() => {
     fetchExpenditures();
-  }, []);
+  }, [searchTerm, categoryFilter]);
 
-  // Filter expenditures based on search, category, and status
+  // Filter expenditures based on search and category
   const filteredExpenditures = expenditures.filter(expenditure => {
     const matchesSearch = !searchTerm || 
       expenditure.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expenditure.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expenditure.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expenditure.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expenditure.paymentMethod?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expenditure.receiptNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesCategory = !categoryFilter || expenditure.category === categoryFilter;
-    const matchesStatus = !statusFilter || expenditure.status === statusFilter;
     
-    return matchesSearch && matchesCategory && matchesStatus;
+    return matchesSearch && matchesCategory;
   });
 
   // Handle record expenditure click
@@ -77,18 +86,6 @@ const Expenditures = () => {
     }
   };
 
-  // Handle status update
-  const handleStatusUpdate = async (id, newStatus) => {
-    try {
-      await expenditureService.updateStatus(id, { status: newStatus });
-      toast.success('Expenditure status updated successfully');
-      fetchExpenditures(); // Refresh the list
-    } catch (error) {
-      console.error('Error updating expenditure status:', error);
-      toast.error('Failed to update expenditure status');
-    }
-  };
-
   // Handle form close
   const handleFormClose = () => {
     setShowForm(false);
@@ -111,126 +108,152 @@ const Expenditures = () => {
       )}
 
       <div className="page-header">
-        <h1>Expenditures</h1>
+        <div className="page-title-section">
+          <h1>
+            Financial Expenditures
+          </h1>
+          <p className="page-subtitle">Track and manage financial expenditures across departments</p>
+        </div>
         <button className="primary-button" onClick={handleRecordClick}>
+          <FaPlus />
           Record Expenditure
         </button>
       </div>
 
-      <div className="filters">
-        <input
-          type="text"
-          placeholder="Search expenditures..."
-          className="search-input"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <select
-          className="filter-select"
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-        >
-          <option value="">All Categories</option>
-          <option value="Equipment">Equipment</option>
-          <option value="Training">Training</option>
-          <option value="Maintenance">Maintenance</option>
-          <option value="Operations">Operations</option>
-          <option value="Personnel">Personnel</option>
-          <option value="Medical">Medical</option>
-          <option value="Other">Other</option>
-        </select>
-        <select
-          className="filter-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">All Status</option>
-          <option value="Pending">Pending</option>
-          <option value="Approved">Approved</option>
-          <option value="Processing">Processing</option>
-          <option value="Completed">Completed</option>
-          <option value="Rejected">Rejected</option>
-        </select>
+      <div className="filters-section">
+        <div className="search-group">
+          <input
+            type="text"
+            placeholder="Search expenditures..."
+            className="search-input"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="filter-group">
+          <select
+            className="filter-select"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            <option value="Equipment">Equipment</option>
+            <option value="Training">Training</option>
+            <option value="Maintenance">Maintenance</option>
+            <option value="Operations">Operations</option>
+            <option value="Personnel">Personnel</option>
+            <option value="Medical">Medical</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
       </div>
 
-      <div className="table-container">
-        {loading ? (
-          <div className="loading-message">Loading expenditures...</div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Category</th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th>Department</th>
-                <th>Budget Year</th>
-                <th>Quarter</th>
-                <th>Payment Method</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredExpenditures.length === 0 ? (
+      <div className="content-card">
+        <div className="card-header">
+          <h3>
+            Expenditure Records ({filteredExpenditures.length})
+          </h3>
+        </div>
+
+        <div className="table-container">
+          {loading ? (
+            <div className="loading-message">
+              <div className="loading-spinner"></div>
+              Loading expenditures...
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan="10" className="no-data-message">
-                    No expenditures found
-                  </td>
+                  <th>ID</th>
+                  <th>Category</th>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Department</th>
+                  <th>Budget Year</th>
+                  <th>Quarter</th>
+                  <th>Payment</th>
+                  <th>Actions</th>
                 </tr>
-              ) : (
-                filteredExpenditures.map((expenditure) => (
-                  <tr key={expenditure._id || expenditure.id}>
-                    <td>{expenditure._id?.slice(-6) || expenditure.id}</td>
-                    <td>{expenditure.category}</td>
-                    <td>{expenditure.description}</td>
-                    <td>${expenditure.amount?.toLocaleString() || '0'}</td>
-                    <td>{expenditure.department}</td>
-                    <td>{expenditure.budgetYear}</td>
-                    <td>Q{expenditure.quarter}</td>
-                    <td>{expenditure.paymentMethod}</td>
-                    <td>
-                      <select
-                        className={`status-select ${expenditure.status.toLowerCase()}`}
-                        value={expenditure.status}
-                        onChange={(e) => handleStatusUpdate(expenditure._id || expenditure.id, e.target.value)}
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Processing">Processing</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Rejected">Rejected</option>
-                      </select>
-                    </td>
-                    <td>
-                      <div className="action-buttons">
-                        <button 
-                          className="action-button view"
-                          onClick={() => handleViewClick(expenditure._id || expenditure.id)}
-                        >
-                          View
-                        </button>
-                        <button 
-                          className="action-button edit"
-                          onClick={() => handleEditClick(expenditure)}
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          className="action-button delete"
-                          onClick={() => handleDelete(expenditure._id || expenditure.id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
+              </thead>
+              <tbody>
+                {filteredExpenditures.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" className="no-data-message">
+                      <div>No expenditures found</div>
+                      <small>Try adjusting your search or filters</small>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
+                ) : (
+                  filteredExpenditures.map((expenditure) => (
+                    <tr key={expenditure._id || expenditure.id}>
+                      <td>
+                        <code className="code-cell">
+                          {expenditure._id?.slice(-6) || expenditure.id}
+                        </code>
+                      </td>
+                      <td>
+                        <span className={`category-${expenditure.category?.toLowerCase()}`}>
+                          {expenditure.category}
+                        </span>
+                      </td>
+                      <td className="text-cell">
+                        <div className="item-name">{expenditure.description}</div>
+                        {expenditure.receiptNumber && (
+                          <small className="item-details">
+                            Receipt: {expenditure.receiptNumber}
+                          </small>
+                        )}
+                      </td>
+                      <td className="currency-cell warning-text">
+                        ${expenditure.amount?.toLocaleString() || '0'}
+                      </td>
+                      <td>
+                        <span className="primary-text">{expenditure.department}</span>
+                      </td>
+                      <td className="center-cell secondary-text">
+                        {expenditure.budgetYear}
+                      </td>
+                      <td className="center-cell">
+                        <span className="warning-text">Q{expenditure.quarter}</span>
+                      </td>
+                      <td>
+                        <span className={`payment-${expenditure.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
+                          {expenditure.paymentMethod}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button 
+                            className="action-button view"
+                            onClick={() => handleViewClick(expenditure._id || expenditure.id)}
+                            title="View Details"
+                          >
+                            <FaEye />
+                          </button>
+                          <button 
+                            className="action-button edit"
+                            onClick={() => handleEditClick(expenditure)}
+                            title="Edit Expenditure"
+                          >
+                            <FaEdit />
+                          </button>
+                          <button 
+                            className="action-button delete"
+                            onClick={() => handleDelete(expenditure._id || expenditure.id)}
+                            title="Delete Expenditure"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,114 +1,120 @@
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const User = require('../models/user.model');
 
 // Generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || '30d',
   });
 };
 
 // Register user
 const register = async (req, res) => {
   try {
-    const { firstName, lastName, email, rank, department, password } = req.body;
+    const { email, password, firstName, lastName, rank, department, base, role } = req.body;
 
-    // Check if user exists
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // Create user
-    const user = await User.create({
+    const user = new User({
+      email,
+      password,
       firstName,
       lastName,
-      email,
       rank,
       department,
-      password
+      base,
+      role: role || 'Logistics Officer'
     });
 
-    // Generate token
+    await user.save();
+
     const token = generateToken(user._id);
 
     res.status(201).json({
-      _id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      rank: user.rank,
-      department: user.department,
-      token
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        rank: user.rank,
+        department: user.department,
+        base: user.base,
+        role: user.role
+      }
     });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(400).json({ message: 'Registration failed', error: error.message });
   }
 };
 
 // Login user
 const login = async (req, res) => {
   try {
-    console.log('Login attempt with body:', req.body);
     const { email, password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ message: 'Please provide email and password' });
     }
 
-    // Check for user email
     const user = await User.findOne({ email }).select('+password');
-    console.log('Found user:', user ? 'Yes' : 'No');
-    
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Check password
-    console.log('Comparing passwords...');
-    const isMatch = await user.comparePassword(password);
-    console.log('Password match:', isMatch ? 'Yes' : 'No');
-
-    if (!isMatch) {
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Generate token
     const token = generateToken(user._id);
 
     res.json({
-      _id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      rank: user.rank,
-      department: user.department,
-      token
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        rank: user.rank,
+        department: user.department,
+        base: user.base,
+        role: user.role
+      }
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Login failed', error: error.message });
   }
 };
 
 // Get current user
-const getMe = async (req, res) => {
+const getCurrentUser = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
-    res.json(user);
+    res.json({
+      id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      rank: user.rank,
+      department: user.department,
+      base: user.base,
+      role: user.role
+    });
   } catch (error) {
-    console.error('GetMe error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Failed to get current user', error: error.message });
   }
 };
 
 // Search users/personnel
 const searchUsers = async (req, res) => {
   try {
-    const { search = '', department = '', rank = '', limit = 50 } = req.query;
-    
-    // Build search query
+    const { search, base, department, role } = req.query;
+
     const query = {};
     
     if (search) {
@@ -119,27 +125,18 @@ const searchUsers = async (req, res) => {
       ];
     }
     
-    if (department) {
-      query.department = department;
-    }
-    
-    if (rank) {
-      query.rank = rank;
-    }
-    
-    console.log('User search query:', query);
-    
+    if (base) query.base = base;
+    if (department) query.department = department;
+    if (role) query.role = role;
+
     const users = await User.find(query)
-      .select('firstName lastName email rank department createdAt')
-      .limit(parseInt(limit))
-      .sort({ firstName: 1, lastName: 1 });
-    
-    console.log(`Found ${users.length} users matching search criteria`);
-    
+      .select('firstName lastName email rank department base role')
+      .sort({ lastName: 1, firstName: 1 })
+      .limit(50);
+
     res.json(users);
   } catch (error) {
-    console.error('Search users error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Search failed', error: error.message });
   }
 };
 
@@ -147,20 +144,19 @@ const searchUsers = async (req, res) => {
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find()
-      .select('firstName lastName email rank department createdAt')
-      .sort({ firstName: 1, lastName: 1 });
-    
+      .select('firstName lastName email rank department base role createdAt')
+      .sort({ createdAt: -1 });
+
     res.json(users);
   } catch (error) {
-    console.error('Get all users error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Failed to fetch users', error: error.message });
   }
 };
 
 module.exports = {
   register,
   login,
-  getMe,
+  getCurrentUser,
   searchUsers,
   getAllUsers
 }; 

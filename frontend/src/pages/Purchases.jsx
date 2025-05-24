@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { purchaseService } from '../services/api';
 import PurchaseForm from '../components/forms/PurchaseForm';
+import { 
+  FaPlus, 
+  FaEye, 
+  FaEdit, 
+  FaTrash
+} from 'react-icons/fa';
 import '../styles/Table.css';
 
 const Purchases = () => {
@@ -99,112 +105,154 @@ const Purchases = () => {
       )}
 
       <div className="page-header">
-        <h1>Purchases</h1>
+        <div className="page-title-section">
+          <h1>
+            Purchase Management
+          </h1>
+          <p className="page-subtitle">Manage equipment and supply purchase orders</p>
+        </div>
         <button className="primary-button" onClick={handleNewRequestClick}>
+          <FaPlus />
           New Purchase Request
         </button>
       </div>
 
-      <div className="filters">
-        <input
-          type="text"
-          placeholder="Search purchases..."
-          className="search-input"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <select
-          className="filter-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">All Status</option>
-          <option value="Pending">Pending</option>
-          <option value="Approved">Approved</option>
-          <option value="Processing">Processing</option>
-          <option value="Delivered">Delivered</option>
-          <option value="Cancelled">Cancelled</option>
-        </select>
+      <div className="filters-section">
+        <div className="search-group">
+          <input
+            type="text"
+            placeholder="Search purchases..."
+            className="search-input"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="filter-group">
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Processing">Processing</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
       </div>
 
-      <div className="table-container">
-        {loading ? (
-          <div className="loading-message">Loading purchases...</div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Item</th>
-                <th>Quantity</th>
-                <th>Unit Price</th>
-                <th>Total</th>
-                <th>Supplier</th>
-                <th>Department</th>
-                <th>Status</th>
-                <th>Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {purchases.length === 0 ? (
+      <div className="content-card">
+        <div className="card-header">
+          <h3>
+            Purchase Orders ({purchases.length})
+          </h3>
+        </div>
+
+        <div className="table-container">
+          {loading ? (
+            <div className="loading-message">
+              <div className="loading-spinner"></div>
+              Loading purchases...
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan="10" className="no-data-message">
-                    No purchases found
-                  </td>
+                  <th>ID</th>
+                  <th>Item</th>
+                  <th>Quantity</th>
+                  <th>Unit Price</th>
+                  <th>Total</th>
+                  <th>Supplier</th>
+                  <th>Department</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th>Actions</th>
                 </tr>
-              ) : (
-                purchases.map((purchase) => (
-                  <tr key={purchase._id || purchase.id}>
-                    <td>{purchase._id || purchase.id}</td>
-                    <td>{purchase.item}</td>
-                    <td>{purchase.quantity}</td>
-                    <td>${purchase.unitPrice.toLocaleString()}</td>
-                    <td>${(purchase.quantity * purchase.unitPrice).toLocaleString()}</td>
-                    <td>{purchase.supplier}</td>
-                    <td>{purchase.department}</td>
-                    <td>
-                      <select
-                        className={`status-select ${purchase.status.toLowerCase()}`}
-                        value={purchase.status}
-                        onChange={(e) => handleStatusUpdate(purchase._id, e.target.value)}
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Processing">Processing</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                    </td>
-                    <td>{new Date(purchase.date).toLocaleDateString()}</td>
-                    <td>
-                      <div className="action-buttons">
-                        <button 
-                          className="action-button view"
-                          onClick={() => handleViewClick(purchase._id)}
-                        >
-                          View
-                        </button>
-                        <button 
-                          className="action-button edit"
-                          onClick={() => handleEditClick(purchase)}
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          className="action-button delete"
-                          onClick={() => handleDelete(purchase._id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
+              </thead>
+              <tbody>
+                {purchases.length === 0 ? (
+                  <tr>
+                    <td colSpan="10" className="no-data-message">
+                      <div>No purchases found</div>
+                      <small>Try adjusting your search or filters</small>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
+                ) : (
+                  purchases.map((purchase) => (
+                    <tr key={purchase._id || purchase.id}>
+                      <td>
+                        <code className="code-cell">
+                          {purchase._id || purchase.id}
+                        </code>
+                      </td>
+                      <td className="text-cell">
+                        <div className="item-name">{purchase.item}</div>
+                        <small className="item-details">{purchase.category}</small>
+                      </td>
+                      <td className="center-cell">
+                        {purchase.quantity}
+                      </td>
+                      <td className="currency-cell">
+                        ${purchase.unitPrice.toLocaleString()}
+                      </td>
+                      <td className="currency-cell success-text">
+                        ${(purchase.quantity * purchase.unitPrice).toLocaleString()}
+                      </td>
+                      <td>{purchase.supplier}</td>
+                      <td>
+                        <span className="primary-text">{purchase.department}</span>
+                      </td>
+                      <td>
+                        <select
+                          className={`status-select status-${purchase.status.toLowerCase()}`}
+                          value={purchase.status}
+                          onChange={(e) => handleStatusUpdate(purchase._id, e.target.value)}
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="Approved">Approved</option>
+                          <option value="Processing">Processing</option>
+                          <option value="Delivered">Delivered</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                      </td>
+                      <td className="center-cell">
+                        {new Date(purchase.date).toLocaleDateString()}
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button 
+                            className="action-button view"
+                            onClick={() => handleViewClick(purchase._id)}
+                            title="View Details"
+                          >
+                            <FaEye />
+                          </button>
+                          <button 
+                            className="action-button edit"
+                            onClick={() => handleEditClick(purchase)}
+                            title="Edit Purchase"
+                          >
+                            <FaEdit />
+                          </button>
+                          <button 
+                            className="action-button delete"
+                            onClick={() => handleDelete(purchase._id)}
+                            title="Delete Purchase"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

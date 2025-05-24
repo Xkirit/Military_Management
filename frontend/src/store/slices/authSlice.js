@@ -1,5 +1,4 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { api } from '../api';
 
 // Load persisted state from localStorage
 const loadPersistedState = () => {
@@ -30,6 +29,27 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
+    loginStart: (state) => {
+      state.loading = true;
+      state.error = null;
+    },
+    loginSuccess: (state, action) => {
+      state.loading = false;
+      state.isAuthenticated = true;
+      state.user = action.payload.user;
+      state.token = action.payload.token;
+      localStorage.setItem('token', action.payload.token);
+      localStorage.setItem('user', JSON.stringify(action.payload.user));
+    },
+    loginFailure: (state, action) => {
+      state.loading = false;
+      state.error = action.payload;
+      state.isAuthenticated = false;
+      state.user = null;
+      state.token = null;
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    },
     clearError: (state) => {
       state.error = null;
     },
@@ -46,70 +66,17 @@ const authSlice = createSlice({
       localStorage.setItem('user', JSON.stringify(state.user));
     },
   },
-  extraReducers: (builder) => {
-    builder
-      // Login
-      .addMatcher(
-        api.endpoints.login.matchPending,
-        (state) => {
-          state.loading = true;
-          state.error = null;
-        }
-      )
-      .addMatcher(
-        api.endpoints.login.matchFulfilled,
-        (state, { payload }) => {
-          state.loading = false;
-          state.isAuthenticated = true;
-          state.user = payload.user;
-          state.token = payload.token;
-          localStorage.setItem('token', payload.token);
-          localStorage.setItem('user', JSON.stringify(payload.user));
-        }
-      )
-      .addMatcher(
-        api.endpoints.login.matchRejected,
-        (state, { error }) => {
-          state.loading = false;
-          state.error = error.message;
-          state.isAuthenticated = false;
-          state.user = null;
-          state.token = null;
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-        }
-      )
-      // Register
-      .addMatcher(
-        api.endpoints.register.matchPending,
-        (state) => {
-          state.loading = true;
-          state.error = null;
-        }
-      )
-      .addMatcher(
-        api.endpoints.register.matchFulfilled,
-        (state, { payload }) => {
-          state.loading = false;
-          state.isAuthenticated = true;
-          state.user = payload.user;
-          state.token = payload.token;
-          localStorage.setItem('token', payload.token);
-          localStorage.setItem('user', JSON.stringify(payload.user));
-        }
-      )
-      .addMatcher(
-        api.endpoints.register.matchRejected,
-        (state, { error }) => {
-          state.loading = false;
-          state.error = error.message;
-        }
-      );
-  },
 });
 
 // Actions
-export const { clearError, logout, updateUserProfile } = authSlice.actions;
+export const { 
+  loginStart, 
+  loginSuccess, 
+  loginFailure, 
+  clearError, 
+  logout, 
+  updateUserProfile 
+} = authSlice.actions;
 
 // Selectors
 export const selectAuth = (state) => state.auth;

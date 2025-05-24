@@ -35,8 +35,7 @@ exports.getAllExpenditures = async (req, res) => {
     }
 
     const expenditures = await Expenditure.find(query)
-      .populate('requestedBy', 'firstName lastName rank')
-      .populate('approvedBy', 'firstName lastName rank')
+      .populate('requestedBy', 'firstName lastName role')
       .sort({ createdAt: -1 });
     
     res.status(200).json(expenditures);
@@ -52,8 +51,7 @@ exports.getAllExpenditures = async (req, res) => {
 exports.getExpenditureById = async (req, res) => {
   try {
     const expenditure = await Expenditure.findById(req.params.id)
-      .populate('requestedBy', 'firstName lastName rank')
-      .populate('approvedBy', 'firstName lastName rank');
+      .populate('requestedBy', 'firstName lastName role');
     
     if (!expenditure) {
       return res.status(404).json({ message: 'Expenditure not found' });
@@ -118,13 +116,6 @@ exports.updateExpenditure = async (req, res) => {
       return res.status(404).json({ message: 'Expenditure not found' });
     }
 
-    // Only allow updates if expenditure is pending or processing
-    if (!['Pending', 'Processing'].includes(expenditure.status)) {
-      return res.status(400).json({ 
-        message: 'Cannot update completed or rejected expenditure' 
-      });
-    }
-
     const updatedExpenditure = await Expenditure.findByIdAndUpdate(
       req.params.id,
       { ...req.body, updatedAt: Date.now() },
@@ -149,61 +140,11 @@ exports.deleteExpenditure = async (req, res) => {
       return res.status(404).json({ message: 'Expenditure not found' });
     }
 
-    // Only allow deletion if expenditure is pending
-    if (expenditure.status !== 'Pending') {
-      return res.status(400).json({ 
-        message: 'Can only delete pending expenditures' 
-      });
-    }
-
     await Expenditure.findByIdAndDelete(req.params.id);
     res.status(200).json({ message: 'Expenditure deleted successfully' });
   } catch (error) {
     res.status(500).json({
       message: 'Error deleting expenditure',
-      error: error.message
-    });
-  }
-};
-
-// Update expenditure status
-exports.updateStatus = async (req, res) => {
-  try {
-    const { status } = req.body;
-    const expenditure = await Expenditure.findById(req.params.id);
-    
-    if (!expenditure) {
-      return res.status(404).json({ message: 'Expenditure not found' });
-    }
-
-    // Validate status transition
-    const validTransitions = {
-      'Pending': ['Approved', 'Rejected', 'Processing'],
-      'Processing': ['Completed', 'Rejected'],
-      'Approved': ['Processing', 'Rejected'],
-      'Completed': [],
-      'Rejected': []
-    };
-
-    if (!validTransitions[expenditure.status].includes(status)) {
-      return res.status(400).json({ 
-        message: `Invalid status transition from ${expenditure.status} to ${status}` 
-      });
-    }
-
-    expenditure.status = status;
-    if (status === 'Approved') {
-      expenditure.approvedBy = req.user._id;
-    }
-    if (status === 'Completed') {
-      expenditure.paymentDate = Date.now();
-    }
-
-    await expenditure.save();
-    res.status(200).json(expenditure);
-  } catch (error) {
-    res.status(400).json({
-      message: 'Error updating expenditure status',
       error: error.message
     });
   }

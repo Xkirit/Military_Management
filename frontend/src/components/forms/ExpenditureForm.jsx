@@ -69,8 +69,7 @@ const ExpenditureForm = ({ onClose, onSuccess, editData = null }) => {
         budgetYear: parseInt(formData.budgetYear),
         quarter: parseInt(formData.quarter),
         receiptNumber: formData.receiptNumber,
-        notes: formData.notes,
-        status: 'Pending'
+        notes: formData.notes
       };
 
       if (isEdit) {

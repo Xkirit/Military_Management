@@ -22,20 +22,10 @@ const expenditureSchema = new mongoose.Schema({
     required: [true, 'Department is required'],
     enum: ['Operations', 'Logistics', 'Training', 'Maintenance', 'Intelligence', 'Medical']
   },
-  status: {
-    type: String,
-    required: true,
-    enum: ['Pending', 'Approved', 'Processing', 'Completed', 'Rejected'],
-    default: 'Pending'
-  },
   requestedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
-  },
-  approvedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
   },
   paymentMethod: {
     type: String,
@@ -43,7 +33,8 @@ const expenditureSchema = new mongoose.Schema({
     required: true
   },
   paymentDate: {
-    type: Date
+    type: Date,
+    default: Date.now
   },
   receiptNumber: {
     type: String,

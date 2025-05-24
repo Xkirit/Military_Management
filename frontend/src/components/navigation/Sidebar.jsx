@@ -1,69 +1,109 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth} from '../../contexts/AuthContext';
+import { 
+  FaTachometerAlt, 
+  FaUserTag, 
+  FaExchangeAlt, 
+  FaShoppingCart, 
+  FaReceipt, 
+  FaSignOutAlt,
+  FaUser,
+  FaShieldAlt
+} from 'react-icons/fa';
 import './Sidebar.css';
 
-const Sidebar = () => {
-  const { user } = useAuth();
 
-  const menuItems = [
-    {
-      path: '/dashboard',
-      name: 'Dashboard',
-      icon: '📊'
-    },
-    {
-      path: '/purchases',
-      name: 'Purchases',
-      icon: '🛍️'
-    },
-    {
-      path: '/transfers',
-      name: 'Transfers',
-      icon: '🔄'
-    },
-    {
-      path: '/assignments',
-      name: 'Assignments',
-      icon: '👥'
-    },
-    {
-      path: '/expenditures',
-      name: 'Expenditures',
-      icon: '💰'
+
+const Sidebar = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  console.log('Sidebar Debug - User object:', user);
+  console.log('Sidebar Debug - User properties:', user ? Object.keys(user) : 'User is null/undefined');
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  // Helper function to get user name
+  const getUserName = () => {
+    if (!user) return 'Unknown User';
+    
+    // Try different possible property combinations
+    if (user.firstName && user.lastName) {
+      return `${user.firstName} ${user.lastName}`;
+    } else if (user.name) {
+      return user.name;
+    } else if (user.username) {
+      return user.username;
+    } else if (user.email) {
+      return user.email;
     }
-  ];
+    return 'Unknown User';
+  };
+
+  // Helper function to get user role
+  const getUserRole = () => {
+    if (!user) return 'Unknown Role';
+    return user.role || user.userRole || user.position || 'Unknown Role';
+  };
 
   return (
     <div className="sidebar">
       <div className="sidebar-header">
+        <FaShieldAlt className="logo-icon" />
         <h2>Military Management</h2>
-        <div className="user-info">
-          <span className="user-name">{user?.name}</span>
-          <span className="user-role">{user?.role}</span>
-          {user?.assignedBase && (
-            <span className="user-base">Base: {user.assignedBase}</span>
-          )}
-        </div>
       </div>
 
-      <nav className="sidebar-nav">
-        {menuItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) => 
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-          >
-            <span className="nav-icon">{item.icon}</span>
-            <span className="nav-text">{item.name}</span>
-          </NavLink>
-        ))}
+      <nav className="nav-menu">
+        <ul>
+          <li className="nav-item">
+            <NavLink to="/dashboard" className="nav-link">
+              <FaTachometerAlt className="nav-icon" />
+              <span>Dashboard</span>
+            </NavLink>
+          </li>
+          <li className="nav-item">
+            <NavLink to="/assignments" className="nav-link">
+              <FaUserTag className="nav-icon" />
+              <span>Assignments</span>
+            </NavLink>
+          </li>
+          <li className="nav-item">
+            <NavLink to="/transfers" className="nav-link">
+              <FaExchangeAlt className="nav-icon" />
+              <span>Transfers</span>
+            </NavLink>
+          </li>
+          <li className="nav-item">
+            <NavLink to="/purchases" className="nav-link">
+              <FaShoppingCart className="nav-icon" />
+              <span>Purchases</span>
+            </NavLink>
+          </li>
+          <li className="nav-item">
+            <NavLink to="/expenditures" className="nav-link">
+              <FaReceipt className="nav-icon" />
+              <span>Expenditures</span>
+            </NavLink>
+          </li>
+        </ul>
       </nav>
 
       <div className="sidebar-footer">
-        <p className="version">v1.0.0</p>
+        <div className="user-info">
+          <FaUser className="user-icon" />
+          <div className="user-details">
+            <div className="user-name">{getUserName()}</div>
+            <div className="user-role">{getUserRole()}</div>
+          </div>
+        </div>
+        <button onClick={handleLogout} className="logout-btn">
+          <FaSignOutAlt className="logout-icon" />
+          <span>Logout</span>
+        </button>
       </div>
     </div>
   );

@@ -1,16 +1,18 @@
 const Assignment = require('../models/assignment.model');
-const mongoose = require('mongoose');
+const Purchase = require('../models/purchase.model');
 
 // Create a new assignment
 exports.createAssignment = async (req, res) => {
   try {
     const assignment = new Assignment({
       ...req.body,
-      assignedBy: req.user._id // From auth middleware
+      assignedBy: req.user._id
     });
     
-    const savedAssignment = await assignment.save();
-    res.status(201).json(savedAssignment);
+    await assignment.save();
+    await assignment.populate(['personnel', 'assignedBy', 'equipmentPurchase']);
+    
+    res.status(201).json(assignment);
   } catch (error) {
     res.status(400).json({
       message: 'Error creating assignment',
@@ -23,11 +25,10 @@ exports.createAssignment = async (req, res) => {
 exports.getAllAssignments = async (req, res) => {
   try {
     const assignments = await Assignment.find()
-      .populate('personnel', 'firstName lastName rank')
+      .populate('personnel', 'firstName lastName rank department')
       .populate('assignedBy', 'firstName lastName rank')
-      .populate('approvedBy', 'firstName lastName rank')
-      .populate('equipmentPurchase', 'item category quantity quantityAvailable supplier specifications')
-      .sort({ startDate: 1 });
+      .populate('equipmentPurchase', 'item category unitPrice')
+      .sort({ createdAt: -1 });
     
     res.status(200).json(assignments);
   } catch (error) {
@@ -42,10 +43,9 @@ exports.getAllAssignments = async (req, res) => {
 exports.getAssignmentById = async (req, res) => {
   try {
     const assignment = await Assignment.findById(req.params.id)
-      .populate('personnel', 'firstName lastName rank')
+      .populate('personnel', 'firstName lastName rank department')
       .populate('assignedBy', 'firstName lastName rank')
-      .populate('approvedBy', 'firstName lastName rank')
-      .populate('equipmentPurchase', 'item category quantity quantityAvailable supplier specifications');
+      .populate('equipmentPurchase', 'item category unitPrice supplier');
     
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found' });
@@ -64,16 +64,15 @@ exports.getAssignmentById = async (req, res) => {
 exports.getAssignmentsByPersonnel = async (req, res) => {
   try {
     const assignments = await Assignment.find({ personnel: req.params.personnelId })
-      .populate('personnel', 'firstName lastName rank')
+      .populate('personnel', 'firstName lastName rank department')
       .populate('assignedBy', 'firstName lastName rank')
-      .populate('approvedBy', 'firstName lastName rank')
-      .populate('equipmentPurchase', 'item category quantity quantityAvailable supplier specifications')
-      .sort({ startDate: 1 });
+      .populate('equipmentPurchase', 'item category unitPrice')
+      .sort({ createdAt: -1 });
     
     res.status(200).json(assignments);
   } catch (error) {
     res.status(500).json({
-      message: 'Error fetching assignments',
+      message: 'Error fetching assignments for personnel',
       error: error.message
     });
   }
@@ -88,17 +87,18 @@ exports.updateAssignment = async (req, res) => {
       return res.status(404).json({ message: 'Assignment not found' });
     }
 
-    // Only allow updates if assignment is not completed
     if (assignment.status === 'Completed') {
-      return res.status(400).json({ message: 'Cannot update completed assignment' });
+      return res.status(400).json({ 
+        message: 'Cannot update completed assignment' 
+      });
     }
 
     const updatedAssignment = await Assignment.findByIdAndUpdate(
       req.params.id,
-      { ...req.body, updatedAt: Date.now() },
+      req.body,
       { new: true, runValidators: true }
-    );
-
+    ).populate(['personnel', 'assignedBy', 'equipmentPurchase']);
+    
     res.status(200).json(updatedAssignment);
   } catch (error) {
     res.status(400).json({
@@ -117,7 +117,6 @@ exports.deleteAssignment = async (req, res) => {
       return res.status(404).json({ message: 'Assignment not found' });
     }
 
-    // Only allow deletion if assignment is pending
     if (assignment.status !== 'Pending') {
       return res.status(400).json({ message: 'Can only delete pending assignments' });
     }
@@ -142,26 +141,65 @@ exports.updateStatus = async (req, res) => {
       return res.status(404).json({ message: 'Assignment not found' });
     }
 
-    // Validate status transition
-    const validTransitions = {
-      'Pending': ['Active', 'Cancelled'],
-      'Active': ['Completed', 'Cancelled'],
-      'Completed': [],
-      'Cancelled': []
-    };
-
-    if (!validTransitions[assignment.status].includes(status)) {
+    if (assignment.status === 'Completed' && status !== 'Completed') {
       return res.status(400).json({ 
-        message: `Invalid status transition from ${assignment.status} to ${status}` 
+        message: 'Cannot change status of completed assignment' 
       });
     }
 
+    const allowedStatuses = ['Pending', 'Active', 'Completed', 'Cancelled'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ 
+        message: `Invalid status: ${status}. Allowed statuses: ${allowedStatuses.join(', ')}` 
+      });
+    }
+
+    // Equipment return logic when assignment is completed
+    if (status === 'Completed' && assignment.equipmentPurchase && assignment.equipmentQuantity > 0) {
+      try {
+        const purchase = await Purchase.findById(assignment.equipmentPurchase);
+        if (purchase) {
+          purchase.quantityAvailable = (purchase.quantityAvailable || 0) + assignment.equipmentQuantity;
+          await purchase.save();
+          console.log(`Returned ${assignment.equipmentQuantity} units of ${purchase.item} to inventory`);
+        }
+      } catch (equipmentError) {
+        console.error('Error returning equipment to inventory:', equipmentError);
+      }
+    }
+
+    // Equipment allocation logic when assignment becomes active
+    if (status === 'Active' && assignment.equipmentPurchase && assignment.equipmentQuantity > 0) {
+      try {
+        const purchase = await Purchase.findById(assignment.equipmentPurchase);
+        if (purchase) {
+          if (purchase.quantityAvailable >= assignment.equipmentQuantity) {
+            purchase.quantityAvailable -= assignment.equipmentQuantity;
+            await purchase.save();
+            console.log(`Allocated ${assignment.equipmentQuantity} units of ${purchase.item} from inventory`);
+          } else {
+            return res.status(400).json({
+              message: `Insufficient equipment available. Required: ${assignment.equipmentQuantity}, Available: ${purchase.quantityAvailable}`
+            });
+          }
+        }
+      } catch (equipmentError) {
+        console.error('Error allocating equipment from inventory:', equipmentError);
+        return res.status(500).json({
+          message: 'Error allocating equipment from inventory',
+          error: equipmentError.message
+        });
+      }
+    }
+
     assignment.status = status;
-    if (status === 'Active') {
+    if (status === 'Completed') {
       assignment.approvedBy = req.user._id;
     }
 
     await assignment.save();
+    await assignment.populate(['personnel', 'assignedBy', 'equipmentPurchase']);
+    
     res.status(200).json(assignment);
   } catch (error) {
     res.status(400).json({

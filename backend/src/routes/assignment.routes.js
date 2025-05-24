@@ -1,27 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const assignmentController = require('../controllers/assignment.controller');
+const {
+  createAssignment,
+  getAllAssignments,
+  getAssignmentById,
+  getAssignmentsByPersonnel,
+  updateAssignment,
+  deleteAssignment,
+  updateStatus
+} = require('../controllers/assignment.controller');
 const { protect } = require('../middleware/auth.middleware');
+const { checkPermission } = require('../middleware/rbac.middleware');
 
-// Create a new assignment
-router.post('/', protect, assignmentController.createAssignment);
+router.route('/')
+  .post(protect, checkPermission('create_assignment'), createAssignment)
+  .get(protect, getAllAssignments);
 
-// Get all assignments
-router.get('/', protect, assignmentController.getAllAssignments);
+router.route('/:id')
+  .get(protect, getAssignmentById)
+  .put(protect, checkPermission('update_own_assignment'), updateAssignment)
+  .delete(protect, checkPermission('delete_own_assignment'), deleteAssignment);
 
-// Get assignment by ID
-router.get('/:id', protect, assignmentController.getAssignmentById);
-
-// Get assignments by personnel
-router.get('/personnel/:personnelId', protect, assignmentController.getAssignmentsByPersonnel);
-
-// Update assignment
-router.put('/:id', protect, assignmentController.updateAssignment);
-
-// Delete assignment
-router.delete('/:id', protect, assignmentController.deleteAssignment);
-
-// Update assignment status
-router.patch('/:id/status', protect, assignmentController.updateStatus);
+router.get('/personnel/:personnelId', protect, getAssignmentsByPersonnel);
+router.patch('/:id/status', protect, checkPermission('update_own_assignment'), updateStatus);
 
 module.exports = router; 

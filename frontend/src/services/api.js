@@ -1,22 +1,25 @@
 import axios from 'axios';
+import { store } from '../store/index';
 
-const API_URL = 'http://localhost:5002/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003/api';
 
-// Create axios instance
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add request interceptor to add auth token
+// Add auth token to requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const state = store.getState();
+    const token = state.auth.token;
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
     return config;
   },
   (error) => {
@@ -24,79 +27,76 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle errors
+// Handle response errors and token expiration
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      store.dispatch({ type: 'auth/logout' });
       window.location.href = '/login';
     }
     return Promise.reject(error);
   }
 );
 
-// Auth services
 export const authService = {
-  register: (userData) => api.post('/auth/register', userData),
   login: (credentials) => api.post('/auth/login', credentials),
-  getProfile: () => api.get('/auth/me'),
+  register: (userData) => api.post('/auth/register', userData),
+  getCurrentUser: () => api.get('/auth/current'),
+  searchUsers: (params) => api.get('/auth/search', { params })
 };
 
-// User/Personnel services
 export const userService = {
-  searchUsers: (params) => api.get('/auth/users/search', { params }),
-  getAllUsers: () => api.get('/auth/users'),
+  getAll: () => api.get('/auth/users'),
+  getById: (id) => api.get(`/auth/users/${id}`),
+  update: (id, userData) => api.put(`/auth/users/${id}`, userData),
+  delete: (id) => api.delete(`/auth/users/${id}`)
 };
 
-// Dashboard services
 export const dashboardService = {
   getMetrics: (params) => api.get('/dashboard/metrics', { params }),
   getDepartmentSummary: (params) => api.get('/dashboard/departments', { params }),
   getRecentActivities: (params) => api.get('/dashboard/activities', { params }),
-  getNetMovementDetails: (params) => api.get('/dashboard/net-movement', { params }),
+  getNetMovementDetails: (params) => api.get('/dashboard/net-movement', { params })
 };
 
-// Transfer services
 export const transferService = {
-  createTransfer: (data) => api.post('/transfers', data),
-  getAllTransfers: () => api.get('/transfers'),
-  getTransferById: (id) => api.get(`/transfers/${id}`),
-  updateTransfer: (id, data) => api.put(`/transfers/${id}`, data),
-  deleteTransfer: (id) => api.delete(`/transfers/${id}`),
-  updateStatus: (id, status) => api.patch(`/transfers/${id}/status`, { status }),
+  getAllTransfers: (params) => api.get('/transfers', { params }),
+  getById: (id) => api.get(`/transfers/${id}`),
+  create: (data) => api.post('/transfers', data),
+  update: (id, data) => api.put(`/transfers/${id}`, data),
+  delete: (id) => api.delete(`/transfers/${id}`),
+  updateStatus: (id, status) => api.patch(`/transfers/${id}/status`, { status })
 };
 
-// Assignment services
 export const assignmentService = {
-  createAssignment: (data) => api.post('/assignments', data),
-  getAllAssignments: () => api.get('/assignments'),
-  getAssignmentById: (id) => api.get(`/assignments/${id}`),
-  getAssignmentsByPersonnel: (personnelId) => api.get(`/assignments/personnel/${personnelId}`),
-  updateAssignment: (id, data) => api.put(`/assignments/${id}`, data),
-  deleteAssignment: (id) => api.delete(`/assignments/${id}`),
-  updateStatus: (id, status) => api.patch(`/assignments/${id}/status`, { status }),
+  getAllAssignments: (params) => api.get('/assignments', { params }),
+  getById: (id) => api.get(`/assignments/${id}`),
+  getByPersonnel: (personnelId) => api.get(`/assignments/personnel/${personnelId}`),
+  create: (data) => api.post('/assignments', data),
+  update: (id, data) => api.put(`/assignments/${id}`, data),
+  delete: (id) => api.delete(`/assignments/${id}`),
+  updateStatus: (id, status) => api.patch(`/assignments/${id}/status`, { status })
 };
 
-// Expenditure services
 export const expenditureService = {
-  createExpenditure: (data) => api.post('/expenditures', data),
   getAllExpenditures: (params) => api.get('/expenditures', { params }),
-  getExpenditureById: (id) => api.get(`/expenditures/${id}`),
-  getExpenditureSummary: (params) => api.get('/expenditures/summary', { params }),
-  updateExpenditure: (id, data) => api.put(`/expenditures/${id}`, data),
-  deleteExpenditure: (id) => api.delete(`/expenditures/${id}`),
-  updateStatus: (id, status) => api.patch(`/expenditures/${id}/status`, { status }),
+  getById: (id) => api.get(`/expenditures/${id}`),
+  getSummary: (params) => api.get('/expenditures/summary', { params }),
+  create: (data) => api.post('/expenditures', data),
+  update: (id, data) => api.put(`/expenditures/${id}`, data),
+  delete: (id) => api.delete(`/expenditures/${id}`)
 };
 
-// Purchase services
 export const purchaseService = {
-  createPurchase: (data) => api.post('/purchases', data),
   getAllPurchases: (params) => api.get('/purchases', { params }),
+  getById: (id) => api.get(`/purchases/${id}`),
   getAvailableEquipment: (params) => api.get('/purchases/available-equipment', { params }),
-  getPurchaseById: (id) => api.get(`/purchases/${id}`),
-  updatePurchase: (id, data) => api.put(`/purchases/${id}`, data),
-  deletePurchase: (id) => api.delete(`/purchases/${id}`),
+  create: (data) => api.post('/purchases', data),
+  update: (id, data) => api.put(`/purchases/${id}`, data),
+  delete: (id) => api.delete(`/purchases/${id}`),
   updateStatus: (id, status) => api.patch(`/purchases/${id}/status`, { status }),
-}; 
+  approve: (id) => api.patch(`/purchases/${id}/approve`)
+};
+
+export default api; 
