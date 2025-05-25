@@ -20,7 +20,9 @@ const corsOptions = {
       'http://localhost:5174', 
       'http://localhost:5175',
       'http://localhost:3000',
-      process.env.CLIENT_URL // Your frontend URL on Render 
+      process.env.CLIENT_URL, // Your frontend URL
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null, // Vercel preview URLs
+      'https://your-app-name.vercel.app' // Replace with your actual Vercel app URL
     ].filter(Boolean); // Remove undefined values
     
     if (allowedOrigins.indexOf(origin) !== -1) {
@@ -69,10 +71,15 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`MongoDB URI: ${process.env.MONGODB_URI ? 'Connected' : 'Not configured'}`);
-}); 
+// Start server (for local development)
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`MongoDB URI: ${process.env.MONGODB_URI ? 'Connected' : 'Not configured'}`);
+  });
+}
+
+// Export the app for Vercel
+module.exports = app; 
