@@ -1,54 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import { purchaseService } from '../services/api';
+import { usePurchases, useDeletePurchase, useUpdatePurchaseStatus } from '../hooks/useQueries';
+import { usePermissions } from '../hooks/usePermissions';
 import PurchaseForm from '../components/forms/PurchaseForm';
 import { 
   FaPlus, 
-  FaEye, 
   FaEdit, 
   FaTrash
 } from 'react-icons/fa';
 import '../styles/Table.css';
 
 const Purchases = () => {
-  const [purchases, setPurchases] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { canUpdatePurchase, canDeletePurchase, canCreatePurchase } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editData, setEditData] = useState(null);
 
-  // Fetch purchases
-  const fetchPurchases = async () => {
-    try {
-      setLoading(true);
-      const response = await purchaseService.getAllPurchases({
-        search: searchTerm,
-        status: statusFilter
-      });
-      setPurchases(response.data);
-    } catch (error) {
+  // Use React Query for caching
+  const { 
+    data: purchases = [], 
+    isLoading: loading,
+    error
+  } = usePurchases({
+    search: searchTerm,
+    status: statusFilter
+  });
+
+  const deletePurchaseMutation = useDeletePurchase();
+  const updatePurchaseStatusMutation = useUpdatePurchaseStatus();
+
+  // Handle API errors
+  React.useEffect(() => {
+    if (error) {
       console.error('Error fetching purchases:', error);
       toast.error('Failed to fetch purchases');
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchPurchases();
-  }, [searchTerm, statusFilter]);
+  }, [error]);
 
   // Handle new purchase request click
   const handleNewRequestClick = () => {
     setEditData(null);
     setShowForm(true);
-  };
-
-  // Handle view click
-  const handleViewClick = (id) => {
-    // TODO: Implement view details modal or navigation
-    toast.info(`View purchase ${id} details coming soon`);
   };
 
   // Handle edit click
@@ -61,12 +54,15 @@ const Purchases = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this purchase?')) {
       try {
-        await purchaseService.deletePurchase(id);
+        await deletePurchaseMutation.mutateAsync(id);
         toast.success('Purchase deleted successfully');
-        fetchPurchases(); // Refresh the list
+        // Data will automatically refresh due to query invalidation
       } catch (error) {
         console.error('Error deleting purchase:', error);
-        toast.error('Failed to delete purchase');
+        const errorMessage = error.response?.data?.message || 
+                            error.response?.data?.error || 
+                            'Failed to delete purchase';
+        toast.error(errorMessage);
       }
     }
   };
@@ -74,12 +70,18 @@ const Purchases = () => {
   // Handle status update
   const handleStatusUpdate = async (id, newStatus) => {
     try {
-      await purchaseService.updateStatus(id, newStatus);
+      await updatePurchaseStatusMutation.mutateAsync({ 
+        id, 
+        status: newStatus 
+      });
       toast.success('Purchase status updated successfully');
-      fetchPurchases(); // Refresh the list
+      // Data will automatically refresh due to query invalidation
     } catch (error) {
       console.error('Error updating purchase status:', error);
-      toast.error('Failed to update purchase status');
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          'Failed to update purchase status';
+      toast.error(errorMessage);
     }
   };
 
@@ -89,9 +91,9 @@ const Purchases = () => {
     setEditData(null);
   };
 
-  // Handle form success
+  // Handle form success - no need to manually refresh, React Query will handle it
   const handleFormSuccess = () => {
-    fetchPurchases();
+    // Data will automatically refresh due to query invalidation in mutations
   };
 
   return (
@@ -111,10 +113,12 @@ const Purchases = () => {
           </h1>
           <p className="page-subtitle">Manage equipment and supply purchase orders</p>
         </div>
-        <button className="primary-button" onClick={handleNewRequestClick}>
-          <FaPlus />
-          New Purchase Request
-        </button>
+        {canCreatePurchase() && (
+          <button className="primary-button" onClick={handleNewRequestClick}>
+            <FaPlus />
+            New Purchase Request
+          </button>
+        )}
       </div>
 
       <div className="filters-section">
@@ -223,27 +227,27 @@ const Purchases = () => {
                       </td>
                       <td>
                         <div className="action-buttons">
-                          <button 
-                            className="action-button view"
-                            onClick={() => handleViewClick(purchase._id)}
-                            title="View Details"
-                          >
-                            <FaEye />
-                          </button>
-                          <button 
-                            className="action-button edit"
-                            onClick={() => handleEditClick(purchase)}
-                            title="Edit Purchase"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button 
-                            className="action-button delete"
-                            onClick={() => handleDelete(purchase._id)}
-                            title="Delete Purchase"
-                          >
-                            <FaTrash />
-                          </button>
+                          {canUpdatePurchase(purchase.requestedBy?._id || purchase.requestedBy) && (
+                            <button 
+                              className="action-button edit"
+                              onClick={() => handleEditClick(purchase)}
+                              title="Edit Purchase"
+                            >
+                              <FaEdit />
+                            </button>
+                          )}
+                          {canDeletePurchase(purchase.requestedBy?._id || purchase.requestedBy) && (
+                            <button 
+                              className="action-button delete"
+                              onClick={() => handleDelete(purchase._id)}
+                              title="Delete Purchase"
+                            >
+                              <FaTrash />
+                            </button>
+                          )}
+                          {!canUpdatePurchase(purchase.requestedBy?._id || purchase.requestedBy) && !canDeletePurchase(purchase.requestedBy?._id || purchase.requestedBy) && (
+                            <span className="no-actions">No actions available</span>
+                          )}
                         </div>
                       </td>
                     </tr>

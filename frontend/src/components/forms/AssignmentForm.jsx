@@ -1,13 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
-import { assignmentService, userService, purchaseService } from '../../services/api';
+import { useCreateAssignment, useUpdateAssignment } from '../../hooks/useQueries';
+import { purchaseService, authService } from '../../services/api';
 import './Forms.css';
 
 const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
   const { user } = useAuth();
   const isEdit = !!editData;
   
+  const createAssignmentMutation = useCreateAssignment();
+  const updateAssignmentMutation = useUpdateAssignment();
+
+  // Refs for click outside detection
+  const personnelDropdownRef = useRef(null);
+  const equipmentDropdownRef = useRef(null);
+
   const [formData, setFormData] = useState({
     personnel: editData?.personnel?._id || editData?.personnel || '',
     assignment: editData?.assignment || '',
@@ -19,7 +27,7 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
   });
 
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
+  const loading = createAssignmentMutation.isPending || updateAssignmentMutation.isPending;
   
   // Personnel search state
   const [personnelSearch, setPersonnelSearch] = useState('');
@@ -34,6 +42,10 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
   const [showEquipmentDropdown, setShowEquipmentDropdown] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState(null);
   const [equipmentLoading, setEquipmentLoading] = useState(false);
+
+  // Debounce refs
+  const personnelSearchTimeout = useRef(null);
+  const equipmentSearchTimeout = useRef(null);
 
   // Initialize selected personnel if editing
   useEffect(() => {
@@ -53,23 +65,41 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
 
   // Search personnel function
   const searchPersonnel = async (searchTerm) => {
+    console.log('🔍 Personnel Search Debug - Starting search with term:', searchTerm);
+    
     if (!searchTerm || searchTerm.length < 2) {
+      console.log('🔍 Personnel Search Debug - Search term too short, clearing results');
       setSearchResults([]);
       return;
     }
 
     setSearchLoading(true);
+    console.log('🔍 Personnel Search Debug - Setting loading to true, making API call...');
+    
     try {
-      const response = await userService.searchUsers({ 
+      console.log('🔍 Personnel Search Debug - Calling authService.searchUsers with params:', { 
         search: searchTerm,
         limit: 10 
       });
+      
+      const response = await authService.searchUsers({ 
+        search: searchTerm,
+        limit: 10 
+      });
+      
+      console.log('🔍 Personnel Search Debug - API Response received:', response);
+      console.log('🔍 Personnel Search Debug - Response data:', response.data);
+      
       setSearchResults(response.data);
+      console.log('🔍 Personnel Search Debug - Search results set:', response.data);
     } catch (error) {
-      console.error('Error searching personnel:', error);
-      toast.error('Failed to search personnel');
+      console.error('🔍 Personnel Search Debug - Error occurred:', error);
+      console.error('🔍 Personnel Search Debug - Error response:', error.response);
+      console.error('🔍 Personnel Search Debug - Error message:', error.message);
+      toast.error('Failed to search personnel: ' + (error.response?.data?.message || error.message));
     } finally {
       setSearchLoading(false);
+      console.log('🔍 Personnel Search Debug - Setting loading to false');
     }
   };
 
@@ -95,6 +125,26 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
     searchEquipment('');
   }, []);
 
+  // Click outside detection
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (personnelDropdownRef.current && !personnelDropdownRef.current.contains(event.target)) {
+        setShowPersonnelDropdown(false);
+      }
+      if (equipmentDropdownRef.current && !equipmentDropdownRef.current.contains(event.target)) {
+        setShowEquipmentDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      // Cleanup timeouts
+      clearTimeout(personnelSearchTimeout.current);
+      clearTimeout(equipmentSearchTimeout.current);
+    };
+  }, []);
+
   // Handle personnel search input
   const handlePersonnelSearch = (e) => {
     const value = e.target.value;
@@ -108,7 +158,8 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
     }
     
     // Debounce search
-    setTimeout(() => searchPersonnel(value), 300);
+    clearTimeout(personnelSearchTimeout.current);
+    personnelSearchTimeout.current = setTimeout(() => searchPersonnel(value), 300);
   };
 
   // Handle equipment search input
@@ -124,7 +175,8 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
     }
     
     // Debounce search
-    setTimeout(() => searchEquipment(value), 300);
+    clearTimeout(equipmentSearchTimeout.current);
+    equipmentSearchTimeout.current = setTimeout(() => searchEquipment(value), 300);
   };
 
   // Handle personnel selection
@@ -196,29 +248,20 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    setLoading(true);
     try {
       const submissionData = {
-        personnel: formData.personnel,
-        assignment: formData.assignment,
-        unit: formData.unit,
-        duties: formData.duties.split('\n').filter(duty => duty.trim() !== ''),
-        description: formData.description,
-        status: 'Pending',
-        assignedBy: user._id,
-        equipmentQuantity: parseInt(formData.equipmentQuantity) || 1
+        ...formData,
+        equipmentQuantity: parseInt(formData.equipmentQuantity)
       };
 
-      // Add equipment data if selected
-      if (formData.equipmentPurchase) {
-        submissionData.equipmentPurchase = formData.equipmentPurchase;
-      }
-
       if (isEdit) {
-        await assignmentService.updateAssignment(editData._id || editData.id, submissionData);
+        await updateAssignmentMutation.mutateAsync({ 
+          id: editData._id || editData.id, 
+          data: submissionData 
+        });
         toast.success('Assignment updated successfully');
       } else {
-        await assignmentService.createAssignment(submissionData);
+        await createAssignmentMutation.mutateAsync(submissionData);
         toast.success('Assignment created successfully');
       }
 
@@ -230,8 +273,6 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
                           error.response?.data?.error || 
                           'An error occurred while submitting the assignment';
       toast.error(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -260,7 +301,7 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
               />
               
               {showPersonnelDropdown && (searchResults.length > 0 || searchLoading) && (
-                <div className="personnel-dropdown">
+                <div className="personnel-dropdown" ref={personnelDropdownRef}>
                   {searchLoading ? (
                     <div className="personnel-option loading">Searching...</div>
                   ) : (
@@ -376,7 +417,7 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
                 />
                 
                 {showEquipmentDropdown && (
-                  <div className="personnel-dropdown">
+                  <div className="personnel-dropdown" ref={equipmentDropdownRef}>
                     {equipmentLoading ? (
                       <div className="personnel-option loading">Loading equipment...</div>
                     ) : availableEquipment.length === 0 ? (

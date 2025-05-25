@@ -1,40 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import { assignmentService } from '../services/api';
+import { useAssignments, useDeleteAssignment, useUpdateAssignment, useUpdateAssignmentStatus } from '../hooks/useQueries';
+import { usePermissions } from '../hooks/usePermissions';
 import AssignmentForm from '../components/forms/AssignmentForm';
 import { 
   FaPlus, 
-  FaEye, 
   FaEdit, 
   FaTrash
 } from 'react-icons/fa';
 import '../styles/Table.css';
 
 const Assignments = () => {
-  const [assignments, setAssignments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { canUpdateAssignment, canDeleteAssignment, canCreateAssignment } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editData, setEditData] = useState(null);
 
-  // Fetch assignments
-  const fetchAssignments = async () => {
-    try {
-      setLoading(true);
-      const response = await assignmentService.getAllAssignments();
-      setAssignments(response.data);
-    } catch (error) {
+  // Use React Query for caching
+  const { 
+    data: assignments = [], 
+    isLoading: loading,
+    error 
+  } = useAssignments({
+    search: searchTerm,
+    status: statusFilter
+  });
+
+  const deleteAssignmentMutation = useDeleteAssignment();
+  const updateAssignmentMutation = useUpdateAssignment();
+  const updateAssignmentStatusMutation = useUpdateAssignmentStatus();
+
+  // Handle API errors
+  React.useEffect(() => {
+    if (error) {
       console.error('Error fetching assignments:', error);
       toast.error('Failed to fetch assignments');
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchAssignments();
-  }, []);
+  }, [error]);
 
   // Filter assignments based on search and status
   const filteredAssignments = assignments.filter(assignment => {
@@ -63,12 +66,6 @@ const Assignments = () => {
     setShowForm(true);
   };
 
-  // Handle view click
-  const handleViewClick = (id) => {
-    // TODO: Implement view details modal or navigation
-    toast.info(`View assignment ${id} details coming soon`);
-  };
-
   // Handle edit click
   const handleEditClick = (assignment) => {
     setEditData(assignment);
@@ -79,12 +76,15 @@ const Assignments = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this assignment?')) {
       try {
-        await assignmentService.deleteAssignment(id);
+        await deleteAssignmentMutation.mutateAsync(id);
         toast.success('Assignment deleted successfully');
-        fetchAssignments(); // Refresh the list
+        // Data will automatically refresh due to query invalidation
       } catch (error) {
         console.error('Error deleting assignment:', error);
-        toast.error('Failed to delete assignment');
+        const errorMessage = error.response?.data?.message || 
+                            error.response?.data?.error || 
+                            'Failed to delete assignment';
+        toast.error(errorMessage);
       }
     }
   };
@@ -92,12 +92,18 @@ const Assignments = () => {
   // Handle status update
   const handleStatusUpdate = async (id, newStatus) => {
     try {
-      await assignmentService.updateStatus(id, { status: newStatus });
+      await updateAssignmentStatusMutation.mutateAsync({ 
+        id, 
+        status: newStatus 
+      });
       toast.success('Assignment status updated successfully');
-      fetchAssignments(); // Refresh the list
+      // Data will automatically refresh due to query invalidation
     } catch (error) {
       console.error('Error updating assignment status:', error);
-      toast.error('Failed to update assignment status');
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          'Failed to update assignment status';
+      toast.error(errorMessage);
     }
   };
 
@@ -107,9 +113,9 @@ const Assignments = () => {
     setEditData(null);
   };
 
-  // Handle form success
+  // Handle form success - no need to manually refresh, React Query will handle it
   const handleFormSuccess = () => {
-    fetchAssignments();
+    // Data will automatically refresh due to query invalidation in mutations
   };
 
   return (
@@ -129,10 +135,12 @@ const Assignments = () => {
           </h1>
           <p className="page-subtitle">Manage personnel assignments and equipment allocation</p>
         </div>
-        <button className="primary-button" onClick={handleCreateClick}>
-          <FaPlus />
-          Create Assignment
-        </button>
+        {canCreateAssignment() && (
+          <button className="primary-button" onClick={handleCreateClick}>
+            <FaPlus />
+            Create Assignment
+          </button>
+        )}
       </div>
 
       <div className="filters-section">
@@ -252,27 +260,27 @@ const Assignments = () => {
                       </td>
                       <td>
                         <div className="action-buttons">
-                          <button 
-                            className="action-button view"
-                            onClick={() => handleViewClick(assignment._id || assignment.id)}
-                            title="View Details"
-                          >
-                            <FaEye />
-                          </button>
-                          <button 
-                            className="action-button edit"
-                            onClick={() => handleEditClick(assignment)}
-                            title="Edit Assignment"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button 
-                            className="action-button delete"
-                            onClick={() => handleDelete(assignment._id || assignment.id)}
-                            title="Delete Assignment"
-                          >
-                            <FaTrash />
-                          </button>
+                          {canUpdateAssignment(assignment.assignedBy?._id || assignment.assignedBy) && (
+                            <button 
+                              className="action-button edit"
+                              onClick={() => handleEditClick(assignment)}
+                              title="Edit Assignment"
+                            >
+                              <FaEdit />
+                            </button>
+                          )}
+                          {canDeleteAssignment(assignment.assignedBy?._id || assignment.assignedBy) && (
+                            <button 
+                              className="action-button delete"
+                              onClick={() => handleDelete(assignment._id || assignment.id)}
+                              title="Delete Assignment"
+                            >
+                              <FaTrash />
+                            </button>
+                          )}
+                          {!canUpdateAssignment(assignment.assignedBy?._id || assignment.assignedBy) && !canDeleteAssignment(assignment.assignedBy?._id || assignment.assignedBy) && (
+                            <span className="no-actions">No actions available</span>
+                          )}
                         </div>
                       </td>
                     </tr>

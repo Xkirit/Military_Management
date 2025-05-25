@@ -1,9 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import { dashboardService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { PERMISSIONS } from '../config/roles';
+import { 
+  useDashboardMetrics, 
+  useDashboardActivities, 
+  useDashboardDepartments, 
+  useDashboardNetMovement 
+} from '../hooks/useQueries';
 import { 
   FaChartLine, 
   FaMoneyBillWave, 
@@ -31,87 +36,71 @@ const Dashboard = () => {
   console.log('Dashboard Debug - User:', user);
   console.log('Dashboard Debug - API URL:', import.meta.env.VITE_API_URL || 'http://localhost:5003/api');
   
-  const [metrics, setMetrics] = useState({
-    base: '',
-    summary: {
-      totalExpenditures: 0,
-      totalPurchases: 0,
-      basePersonnel: 0,
-      dateRange: { start: '', end: '' }
-    },
-    netMovement: { flowingIn: 0, flowingOut: 0, netBalance: 0 },
-    assignments: { total: 0, byStatus: {} },
-    expenditures: { total: 0, totalAmount: 0, byStatus: {} },
-    transfersOut: { total: 0, totalQuantity: 0, byStatus: {} },
-    transfersIn: { total: 0, totalQuantity: 0, byStatus: {} },
-    purchases: { total: 0, totalAmount: 0, totalQuantity: 0, byStatus: {} },
-    personnel: { total: 0, byDepartment: {} }
-  });
-
-  const [netMovementDetails, setNetMovementDetails] = useState(null);
-  const [recentActivities, setRecentActivities] = useState([]);
-  const [departmentSummary, setDepartmentSummary] = useState([]);
-
   const [filters, setFilters] = useState({ department: '' });
   const [showNetMovement, setShowNetMovement] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  // Use React Query hooks for caching
+  const { 
+    data: metrics = {
+      base: '',
+      summary: { totalExpenditures: 0, totalPurchases: 0, basePersonnel: 0, dateRange: { start: '', end: '' } },
+      netMovement: { flowingIn: 0, flowingOut: 0, netBalance: 0 },
+      assignments: { total: 0, byStatus: {} },
+      expenditures: { total: 0, totalAmount: 0, byStatus: {} },
+      transfersOut: { total: 0, totalQuantity: 0, byStatus: {} },
+      transfersIn: { total: 0, totalQuantity: 0, byStatus: {} },
+      purchases: { total: 0, totalAmount: 0, totalQuantity: 0, byStatus: {} },
+      personnel: { total: 0, byDepartment: {} }
+    }, 
+    isLoading: metricsLoading,
+    error: metricsError 
+  } = useDashboardMetrics({});
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      console.log('Dashboard Debug - Starting API calls...');
-      
-      const [metricsResponse, activitiesResponse, departmentsResponse] = await Promise.all([
-        dashboardService.getMetrics({}),
-        dashboardService.getRecentActivities({ limit: 20 }),
-        dashboardService.getDepartmentSummary({})
-      ]);
-      
-      console.log('Dashboard Debug - Metrics Response:', metricsResponse.data);
-      console.log('Dashboard Debug - Activities Response:', activitiesResponse.data);
-      console.log('Dashboard Debug - Departments Response:', departmentsResponse.data);
-      
-      setMetrics(metricsResponse.data);
-      setRecentActivities(activitiesResponse.data);
-      setDepartmentSummary(departmentsResponse.data);
-    } catch (error) {
-      console.error('Dashboard Debug - Error fetching dashboard data:', error);
-      console.error('Dashboard Debug - Error response:', error.response);
-      toast.error(`Failed to fetch dashboard data: ${error.response?.data?.message || error.message}`);
-      
-      setMetrics({
-        base: user?.base || 'Unknown',
-        summary: { totalExpenditures: 0, totalPurchases: 0, basePersonnel: 0, dateRange: { start: '', end: '' } },
-        netMovement: { flowingIn: 0, flowingOut: 0, netBalance: 0 },
-        assignments: { total: 0, byStatus: {} },
-        expenditures: { total: 0, totalAmount: 0, byStatus: {} },
-        transfersOut: { total: 0, totalQuantity: 0, byStatus: {} },
-        transfersIn: { total: 0, totalQuantity: 0, byStatus: {} },
-        purchases: { total: 0, totalAmount: 0, totalQuantity: 0, byStatus: {} },
-        personnel: { total: 0, byDepartment: {} }
-      });
-      setRecentActivities([]);
-      setDepartmentSummary([]);
-    } finally {
-      setLoading(false);
+  const { 
+    data: recentActivities = [], 
+    isLoading: activitiesLoading,
+    error: activitiesError 
+  } = useDashboardActivities({ limit: 20 });
+
+  const { 
+    data: departmentSummary = [], 
+    isLoading: departmentsLoading,
+    error: departmentsError 
+  } = useDashboardDepartments({});
+
+  const { 
+    data: netMovementDetails, 
+    refetch: fetchNetMovementDetails,
+    isLoading: netMovementLoading 
+  } = useDashboardNetMovement({});
+
+  // Handle any API errors
+  React.useEffect(() => {
+    if (metricsError) {
+      console.error('Dashboard Debug - Error fetching metrics:', metricsError);
+      toast.error(`Failed to fetch dashboard metrics: ${metricsError.response?.data?.message || metricsError.message}`);
     }
-  };
+    if (activitiesError) {
+      console.error('Dashboard Debug - Error fetching activities:', activitiesError);
+      toast.error(`Failed to fetch activities: ${activitiesError.response?.data?.message || activitiesError.message}`);
+    }
+    if (departmentsError) {
+      console.error('Dashboard Debug - Error fetching departments:', departmentsError);
+      toast.error(`Failed to fetch departments: ${departmentsError.response?.data?.message || departmentsError.message}`);
+    }
+  }, [metricsError, activitiesError, departmentsError]);
 
-  const fetchNetMovementDetails = async () => {
+  const handleNetMovementClick = async () => {
     try {
       console.log('Dashboard Debug - Fetching net movement details...');
-      const response = await dashboardService.getNetMovementDetails({});
-      console.log('Dashboard Debug - Net movement response:', response.data);
-      setNetMovementDetails(response.data);
-      setShowNetMovement(true);
-      console.log('Dashboard Debug - Modal should now be visible');
+      const result = await fetchNetMovementDetails();
+      if (result.data) {
+        console.log('Dashboard Debug - Net movement response:', result.data);
+        setShowNetMovement(true);
+        console.log('Dashboard Debug - Modal should now be visible');
+      }
     } catch (error) {
       console.error('Dashboard Debug - Error fetching net movement details:', error);
-      console.error('Dashboard Debug - Error response:', error.response);
       toast.error('Failed to fetch net movement details');
     }
   };
@@ -168,6 +157,8 @@ const Dashboard = () => {
     return 'Limited access view';
   };
 
+  const loading = metricsLoading || activitiesLoading || departmentsLoading;
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
@@ -190,7 +181,7 @@ const Dashboard = () => {
           <div className="metrics-grid">
             <div 
               className="metric-card clickable net-movement-card"
-              onClick={fetchNetMovementDetails}
+              onClick={handleNetMovementClick}
             >
               <h3>Net Movement</h3>
               <p className="metric-value">{formatCurrency(metrics.netMovement?.netBalance || 0)}</p>

@@ -126,8 +126,8 @@ export const ROLE_PERMISSIONS = {
     'user:view',
     'purchase:view', 'purchase:create', 'purchase:update:own', 'purchase:delete:own', 'purchase:manage:inventory',
     'transfer:view', 'transfer:create', 'transfer:update:own', 'transfer:delete:own',
-    'assignment:view',
-    'expenditure:view'
+    'assignment:view', 'assignment:create', 'assignment:update:own', 'assignment:delete:own',
+    'expenditure:view', 'expenditure:create', 'expenditure:update:own', 'expenditure:delete:own'
   ]
 };
 

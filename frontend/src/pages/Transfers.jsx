@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import { transferService } from '../services/api';
+import { useTransfers, useDeleteTransfer, useUpdateTransfer, useUpdateTransferStatus } from '../hooks/useQueries';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import TransferForm from '../components/forms/TransferForm';
 import { 
   FaPlus, 
-  FaEye, 
   FaEdit, 
   FaTrash,
   FaArrowUp,
@@ -15,34 +15,34 @@ import '../styles/Table.css';
 
 const Transfers = () => {
   const { user } = useAuth();
-  const [transfers, setTransfers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { canUpdateTransfer, canDeleteTransfer, canCreateTransfer } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [directionFilter, setDirectionFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editData, setEditData] = useState(null);
 
-  // Fetch transfers
-  const fetchTransfers = async () => {
-    try {
-      setLoading(true);
-      const response = await transferService.getAllTransfers({
-        search: searchTerm,
-        status: statusFilter
-      });
-      setTransfers(response.data);
-    } catch (error) {
+  // Use React Query for caching
+  const { 
+    data: transfers = [], 
+    isLoading: loading,
+    error 
+  } = useTransfers({
+    search: searchTerm,
+    status: statusFilter
+  });
+
+  const deleteTransferMutation = useDeleteTransfer();
+  const updateTransferMutation = useUpdateTransfer();
+  const updateTransferStatusMutation = useUpdateTransferStatus();
+
+  // Handle API errors
+  React.useEffect(() => {
+    if (error) {
       console.error('Error fetching transfers:', error);
       toast.error('Failed to fetch transfers');
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchTransfers();
-  }, [searchTerm, statusFilter]);
+  }, [error]);
 
   // Determine transfer direction relative to user's base
   const getTransferDirection = (transfer) => {
@@ -79,12 +79,6 @@ const Transfers = () => {
     setShowForm(true);
   };
 
-  // Handle view click
-  const handleViewClick = (id) => {
-    // TODO: Implement view details modal or navigation
-    toast.info(`View transfer ${id} details coming soon`);
-  };
-
   // Handle edit click
   const handleEditClick = (transfer) => {
     setEditData(transfer);
@@ -95,12 +89,15 @@ const Transfers = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this transfer?')) {
       try {
-        await transferService.deleteTransfer(id);
+        await deleteTransferMutation.mutateAsync(id);
         toast.success('Transfer deleted successfully');
-        fetchTransfers(); // Refresh the list
+        // Data will automatically refresh due to query invalidation
       } catch (error) {
         console.error('Error deleting transfer:', error);
-        toast.error('Failed to delete transfer');
+        const errorMessage = error.response?.data?.message || 
+                            error.response?.data?.error || 
+                            'Failed to delete transfer';
+        toast.error(errorMessage);
       }
     }
   };
@@ -108,12 +105,18 @@ const Transfers = () => {
   // Handle status update
   const handleStatusUpdate = async (id, newStatus) => {
     try {
-      await transferService.updateStatus(id, { status: newStatus });
+      await updateTransferStatusMutation.mutateAsync({ 
+        id, 
+        status: newStatus 
+      });
       toast.success('Transfer status updated successfully');
-      fetchTransfers(); // Refresh the list
+      // Data will automatically refresh due to query invalidation
     } catch (error) {
       console.error('Error updating transfer status:', error);
-      toast.error('Failed to update transfer status');
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          'Failed to update transfer status';
+      toast.error(errorMessage);
     }
   };
 
@@ -123,9 +126,9 @@ const Transfers = () => {
     setEditData(null);
   };
 
-  // Handle form success
+  // Handle form success - no need to manually refresh, React Query will handle it
   const handleFormSuccess = () => {
-    fetchTransfers();
+    // Data will automatically refresh due to query invalidation in mutations
   };
 
   return (
@@ -145,10 +148,12 @@ const Transfers = () => {
           </h1>
           <p className="page-subtitle">Manage equipment transfers between bases and locations</p>
         </div>
-        <button className="primary-button" onClick={handleInitiateClick}>
-          <FaPlus />
-          Initiate Transfer
-        </button>
+        {canCreateTransfer() && (
+          <button className="primary-button" onClick={handleInitiateClick}>
+            <FaPlus />
+            Initiate Transfer
+          </button>
+        )}
       </div>
 
       <div className="filters-section">
@@ -279,27 +284,27 @@ const Transfers = () => {
                         </td>
                         <td>
                           <div className="action-buttons">
-                            <button 
-                              className="action-button view"
-                              onClick={() => handleViewClick(transfer._id)}
-                              title="View Details"
-                            >
-                              <FaEye />
-                            </button>
-                            <button 
-                              className="action-button edit"
-                              onClick={() => handleEditClick(transfer)}
-                              title="Edit Transfer"
-                            >
-                              <FaEdit />
-                            </button>
-                            <button 
-                              className="action-button delete"
-                              onClick={() => handleDelete(transfer._id)}
-                              title="Delete Transfer"
-                            >
-                              <FaTrash />
-                            </button>
+                            {canUpdateTransfer(transfer.requestedBy) && (
+                              <button 
+                                className="action-button edit"
+                                onClick={() => handleEditClick(transfer)}
+                                title="Edit Transfer"
+                              >
+                                <FaEdit />
+                              </button>
+                            )}
+                            {canDeleteTransfer(transfer.requestedBy) && (
+                              <button 
+                                className="action-button delete"
+                                onClick={() => handleDelete(transfer._id)}
+                                title="Delete Transfer"
+                              >
+                                <FaTrash />
+                              </button>
+                            )}
+                            {!canUpdateTransfer(transfer.requestedBy) && !canDeleteTransfer(transfer.requestedBy) && (
+                              <span className="no-actions">No actions available</span>
+                            )}
                           </div>
                         </td>
                       </tr>

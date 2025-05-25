@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import { expenditureService } from '../services/api';
+import { useExpenditures, useDeleteExpenditure } from '../hooks/useQueries';
+import { usePermissions } from '../hooks/usePermissions';
 import ExpenditureForm from '../components/forms/ExpenditureForm';
 import { 
   FaPlus, 
-  FaEye, 
   FaEdit, 
   FaTrash,
   FaCalendarAlt
@@ -12,33 +12,31 @@ import {
 import '../styles/Table.css';
 
 const Expenditures = () => {
-  const [expenditures, setExpenditures] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { canUpdateExpenditure, canDeleteExpenditure, canCreateExpenditure } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editData, setEditData] = useState(null);
 
-  // Fetch expenditures
-  const fetchExpenditures = async () => {
-    try {
-      setLoading(true);
-      const response = await expenditureService.getAllExpenditures({
-        search: searchTerm,
-        category: categoryFilter
-      });
-      setExpenditures(response.data);
-    } catch (error) {
+  // Use React Query for caching
+  const { 
+    data: expenditures = [], 
+    isLoading: loading,
+    error 
+  } = useExpenditures({
+    search: searchTerm,
+    category: categoryFilter
+  });
+
+  const deleteExpenditureMutation = useDeleteExpenditure();
+
+  // Handle API errors
+  React.useEffect(() => {
+    if (error) {
       console.error('Error fetching expenditures:', error);
       toast.error('Failed to fetch expenditures');
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchExpenditures();
-  }, [searchTerm, categoryFilter]);
+  }, [error]);
 
   // Filter expenditures based on search and category
   const filteredExpenditures = expenditures.filter(expenditure => {
@@ -60,12 +58,6 @@ const Expenditures = () => {
     setShowForm(true);
   };
 
-  // Handle view click
-  const handleViewClick = (id) => {
-    // TODO: Implement view details modal or navigation
-    toast.info(`View expenditure ${id} details coming soon`);
-  };
-
   // Handle edit click
   const handleEditClick = (expenditure) => {
     setEditData(expenditure);
@@ -76,12 +68,15 @@ const Expenditures = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this expenditure?')) {
       try {
-        await expenditureService.deleteExpenditure(id);
+        await deleteExpenditureMutation.mutateAsync(id);
         toast.success('Expenditure deleted successfully');
-        fetchExpenditures(); // Refresh the list
+        // Data will automatically refresh due to query invalidation
       } catch (error) {
         console.error('Error deleting expenditure:', error);
-        toast.error('Failed to delete expenditure');
+        const errorMessage = error.response?.data?.message || 
+                            error.response?.data?.error || 
+                            'Failed to delete expenditure';
+        toast.error(errorMessage);
       }
     }
   };
@@ -92,9 +87,9 @@ const Expenditures = () => {
     setEditData(null);
   };
 
-  // Handle form success
+  // Handle form success - no need to manually refresh, React Query will handle it
   const handleFormSuccess = () => {
-    fetchExpenditures();
+    // Data will automatically refresh due to query invalidation in mutations
   };
 
   return (
@@ -114,10 +109,12 @@ const Expenditures = () => {
           </h1>
           <p className="page-subtitle">Track and manage financial expenditures across departments</p>
         </div>
-        <button className="primary-button" onClick={handleRecordClick}>
-          <FaPlus />
-          Record Expenditure
-        </button>
+        {canCreateExpenditure() && (
+          <button className="primary-button" onClick={handleRecordClick}>
+            <FaPlus />
+            Record Expenditure
+          </button>
+        )}
       </div>
 
       <div className="filters-section">
@@ -224,27 +221,27 @@ const Expenditures = () => {
                       </td>
                       <td>
                         <div className="action-buttons">
-                          <button 
-                            className="action-button view"
-                            onClick={() => handleViewClick(expenditure._id || expenditure.id)}
-                            title="View Details"
-                          >
-                            <FaEye />
-                          </button>
-                          <button 
-                            className="action-button edit"
-                            onClick={() => handleEditClick(expenditure)}
-                            title="Edit Expenditure"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button 
-                            className="action-button delete"
-                            onClick={() => handleDelete(expenditure._id || expenditure.id)}
-                            title="Delete Expenditure"
-                          >
-                            <FaTrash />
-                          </button>
+                          {canUpdateExpenditure(expenditure.recordedBy?._id || expenditure.recordedBy) && (
+                            <button 
+                              className="action-button edit"
+                              onClick={() => handleEditClick(expenditure)}
+                              title="Edit Expenditure"
+                            >
+                              <FaEdit />
+                            </button>
+                          )}
+                          {canDeleteExpenditure(expenditure.recordedBy?._id || expenditure.recordedBy) && (
+                            <button 
+                              className="action-button delete"
+                              onClick={() => handleDelete(expenditure._id || expenditure.id)}
+                              title="Delete Expenditure"
+                            >
+                              <FaTrash />
+                            </button>
+                          )}
+                          {!canUpdateExpenditure(expenditure.recordedBy?._id || expenditure.recordedBy) && !canDeleteExpenditure(expenditure.recordedBy?._id || expenditure.recordedBy) && (
+                            <span className="no-actions">No actions available</span>
+                          )}
                         </div>
                       </td>
                     </tr>

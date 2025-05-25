@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCreatePurchase, useUpdatePurchase } from '../../hooks/useQueries';
 import { purchaseService } from '../../services/api';
 import './Forms.css';
 
@@ -8,6 +9,13 @@ const PurchaseForm = ({ onClose, onSuccess, editData = null }) => {
   const { user } = useAuth();
   const isEdit = !!editData;
   
+  const createPurchaseMutation = useCreatePurchase();
+  const updatePurchaseMutation = useUpdatePurchase();
+
+  // Refs for click outside detection
+  const itemDropdownRef = useRef(null);
+  const supplierDropdownRef = useRef(null);
+
   const [formData, setFormData] = useState({
     item: editData?.item || '',
     category: editData?.category || '',
@@ -21,7 +29,40 @@ const PurchaseForm = ({ onClose, onSuccess, editData = null }) => {
   });
 
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
+  const loading = createPurchaseMutation.isPending || updatePurchaseMutation.isPending;
+
+  // Search states
+  const [itemSearch, setItemSearch] = useState(editData?.item || '');
+  const [supplierSearch, setSupplierSearch] = useState(editData?.supplier || '');
+  const [showItemDropdown, setShowItemDropdown] = useState(false);
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [availableItems, setAvailableItems] = useState([]);
+  const [itemSearchLoading, setItemSearchLoading] = useState(false);
+
+  // Predefined suppliers based on category
+  const supplierSuggestions = {
+    'Weapons': ['Defense Systems Inc', 'Military Arms Corp', 'Tactical Equipment Ltd'],
+    'Vehicles': ['Defense Motors', 'Military Vehicle Systems', 'Tactical Transport Co'],
+    'Communications': ['Defense Communications', 'Military Radio Corp', 'Tactical Comms Ltd'],
+    'Medical': ['Medical Supply Corp', 'Healthcare Systems Inc', 'Emergency Medical Ltd'],
+    'Protective': ['Body Armor Corp', 'Protection Systems Inc', 'Safety Equipment Ltd'],
+    'Office Supplies': ['Office Depot', 'Staples', 'Corporate Supplies Inc'],
+    'Other': ['General Supply Corp', 'Multi-Purpose Equipment Inc']
+  };
+
+  // Category-based item suggestions
+  const itemSuggestions = {
+    'Weapons': ['M16 Rifle', 'M4 Carbine', 'Glock 19', 'Ammunition 5.56mm', 'Holsters'],
+    'Vehicles': ['Humvee', 'Transport Truck', 'Motorcycle', 'ATV', 'Maintenance Vehicle'],
+    'Communications': ['Radio Handset', 'Satellite Phone', 'Antenna System', 'Encryption Device'],
+    'Medical': ['First Aid Kit', 'Trauma Kit', 'Medical Supplies', 'Defibrillator', 'Stretcher'],
+    'Protective': ['Bulletproof Vest', 'Helmet', 'Knee Pads', 'Safety Goggles', 'Gas Mask'],
+    'Office Supplies': ['Computers', 'Printers', 'Paper', 'Stationery', 'Furniture'],
+    'Other': ['Tools', 'Equipment Parts', 'Maintenance Supplies', 'Training Materials']
+  };
+
+  // Debounce refs
+  const itemSearchTimeout = useRef(null);
 
   const validateForm = () => {
     const newErrors = {};
@@ -38,6 +79,124 @@ const PurchaseForm = ({ onClose, onSuccess, editData = null }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Search available items
+  const searchItems = async (searchTerm) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setAvailableItems([]);
+      return;
+    }
+
+    setItemSearchLoading(true);
+    try {
+      const response = await purchaseService.getAvailableEquipment({ 
+        search: searchTerm,
+        limit: 15 
+      });
+      setAvailableItems(response.data);
+    } catch (error) {
+      console.error('Error searching items:', error);
+      // Don't show error toast as this is optional
+    } finally {
+      setItemSearchLoading(false);
+    }
+  };
+
+  // Click outside detection
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (itemDropdownRef.current && !itemDropdownRef.current.contains(event.target)) {
+        setShowItemDropdown(false);
+      }
+      if (supplierDropdownRef.current && !supplierDropdownRef.current.contains(event.target)) {
+        setShowSupplierDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      clearTimeout(itemSearchTimeout.current);
+    };
+  }, []);
+
+  // Handle item search
+  const handleItemSearch = (e) => {
+    const value = e.target.value;
+    setItemSearch(value);
+    setFormData(prev => ({ ...prev, item: value }));
+    setShowItemDropdown(true);
+    
+    // Clear error when user starts typing
+    if (errors.item) {
+      setErrors(prev => ({ ...prev, item: '' }));
+    }
+    
+    // Debounce search
+    clearTimeout(itemSearchTimeout.current);
+    itemSearchTimeout.current = setTimeout(() => searchItems(value), 300);
+  };
+
+  // Handle item selection
+  const handleItemSelect = (item) => {
+    const itemName = typeof item === 'string' ? item : item.item;
+    setItemSearch(itemName);
+    setFormData(prev => ({ ...prev, item: itemName }));
+    setShowItemDropdown(false);
+    
+    // Auto-fill category if available
+    if (typeof item === 'object' && item.category && !formData.category) {
+      setFormData(prev => ({ ...prev, category: item.category }));
+    }
+    
+    // Clear item error if it exists
+    if (errors.item) {
+      setErrors(prev => ({ ...prev, item: '' }));
+    }
+  };
+
+  // Handle supplier search
+  const handleSupplierSearch = (e) => {
+    const value = e.target.value;
+    setSupplierSearch(value);
+    setFormData(prev => ({ ...prev, supplier: value }));
+    setShowSupplierDropdown(value.length > 0);
+    
+    // Clear error when user starts typing
+    if (errors.supplier) {
+      setErrors(prev => ({ ...prev, supplier: '' }));
+    }
+  };
+
+  // Handle supplier selection
+  const handleSupplierSelect = (supplier) => {
+    setSupplierSearch(supplier);
+    setFormData(prev => ({ ...prev, supplier }));
+    setShowSupplierDropdown(false);
+    
+    // Clear supplier error if it exists
+    if (errors.supplier) {
+      setErrors(prev => ({ ...prev, supplier: '' }));
+    }
+  };
+
+  // Get filtered suggestions
+  const getFilteredItems = () => {
+    const suggestions = formData.category ? itemSuggestions[formData.category] || [] : [];
+    if (!itemSearch) return suggestions;
+    return suggestions.filter(item => 
+      item.toLowerCase().includes(itemSearch.toLowerCase())
+    );
+  };
+
+  const getFilteredSuppliers = () => {
+    const suggestions = formData.category ? supplierSuggestions[formData.category] || [] : 
+                       Object.values(supplierSuggestions).flat();
+    if (!supplierSearch) return suggestions;
+    return suggestions.filter(supplier => 
+      supplier.toLowerCase().includes(supplierSearch.toLowerCase())
+    );
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -51,17 +210,21 @@ const PurchaseForm = ({ onClose, onSuccess, editData = null }) => {
         [name]: ''
       }));
     }
+
+    // Update item search when category changes
+    if (name === 'category') {
+      setShowItemDropdown(itemSearch.length > 0);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    setLoading(true);
     try {
       const submitData = {
         ...formData,
-        quantity: parseFloat(formData.quantity),
+        quantity: parseInt(formData.quantity),
         unitPrice: parseFloat(formData.unitPrice),
         department: user.department,
         requestedBy: user._id,
@@ -69,20 +232,24 @@ const PurchaseForm = ({ onClose, onSuccess, editData = null }) => {
       };
 
       if (isEdit) {
-        await purchaseService.updatePurchase(editData._id, submitData);
+        await updatePurchaseMutation.mutateAsync({ 
+          id: editData._id, 
+          data: submitData 
+        });
         toast.success('Purchase updated successfully');
       } else {
-        await purchaseService.createPurchase(submitData);
-        toast.success('Purchase request created successfully');
+        await createPurchaseMutation.mutateAsync(submitData);
+        toast.success('Purchase created successfully');
       }
 
       onSuccess?.();
       onClose?.();
     } catch (error) {
       console.error('Error submitting purchase:', error);
-      toast.error(`Failed to ${isEdit ? 'update' : 'create'} purchase: ${error.response?.data?.message || error.message}`);
-    } finally {
-      setLoading(false);
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          'An error occurred while submitting the purchase';
+      toast.error(errorMessage);
     }
   };
 
@@ -103,15 +270,70 @@ const PurchaseForm = ({ onClose, onSuccess, editData = null }) => {
         <form onSubmit={handleSubmit} className="form-container">
           <div className="form-group">
             <label htmlFor="item">Item Name*</label>
-            <input
-              type="text"
-              id="item"
-              name="item"
-              value={formData.item}
-              onChange={handleChange}
-              className={errors.item ? 'error' : ''}
-              disabled={loading}
-            />
+            <div className="personnel-search-container">
+              <input
+                type="text"
+                id="item"
+                name="item"
+                value={itemSearch}
+                onChange={handleItemSearch}
+                onFocus={() => setShowItemDropdown(true)}
+                className={errors.item ? 'error' : ''}
+                disabled={loading}
+                placeholder="Type to search or select from suggestions..."
+              />
+              
+              {showItemDropdown && (
+                <div className="personnel-dropdown" ref={itemDropdownRef}>
+                  {itemSearchLoading ? (
+                    <div className="personnel-option loading">Searching items...</div>
+                  ) : (
+                    <>
+                      {/* Show available equipment from API */}
+                      {availableItems.length > 0 && (
+                        <>
+                          <div className="dropdown-section-header">Available Equipment</div>
+                          {availableItems.map((item) => (
+                            <div
+                              key={item._id}
+                              className="personnel-option"
+                              onClick={() => handleItemSelect(item)}
+                            >
+                              <div className="personnel-name">{item.item}</div>
+                              <div className="personnel-details">
+                                {item.category} • Available: {item.quantityAvailable} • ${item.unitPrice || 'N/A'}
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                      
+                      {/* Show category-based suggestions */}
+                      {getFilteredItems().length > 0 && (
+                        <>
+                          <div className="dropdown-section-header">
+                            {formData.category ? `${formData.category} Suggestions` : 'Common Items'}
+                          </div>
+                          {getFilteredItems().map((item) => (
+                            <div
+                              key={item}
+                              className="personnel-option"
+                              onClick={() => handleItemSelect(item)}
+                            >
+                              <div className="personnel-name">{item}</div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                      
+                      {availableItems.length === 0 && getFilteredItems().length === 0 && (
+                        <div className="personnel-option loading">No items found</div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             {errors.item && <span className="error-message">{errors.item}</span>}
           </div>
 
@@ -170,15 +392,42 @@ const PurchaseForm = ({ onClose, onSuccess, editData = null }) => {
 
           <div className="form-group">
             <label htmlFor="supplier">Supplier*</label>
-            <input
-              type="text"
-              id="supplier"
-              name="supplier"
-              value={formData.supplier}
-              onChange={handleChange}
-              className={errors.supplier ? 'error' : ''}
-              disabled={loading}
-            />
+            <div className="personnel-search-container">
+              <input
+                type="text"
+                id="supplier"
+                name="supplier"
+                value={supplierSearch}
+                onChange={handleSupplierSearch}
+                onFocus={() => setShowSupplierDropdown(true)}
+                className={errors.supplier ? 'error' : ''}
+                disabled={loading}
+                placeholder="Type to search or select from suggestions..."
+              />
+              
+              {showSupplierDropdown && (
+                <div className="personnel-dropdown" ref={supplierDropdownRef}>
+                  {getFilteredSuppliers().length > 0 ? (
+                    <>
+                      <div className="dropdown-section-header">
+                        {formData.category ? `${formData.category} Suppliers` : 'Suggested Suppliers'}
+                      </div>
+                      {getFilteredSuppliers().map((supplier) => (
+                        <div
+                          key={supplier}
+                          className="personnel-option"
+                          onClick={() => handleSupplierSelect(supplier)}
+                        >
+                          <div className="personnel-name">{supplier}</div>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div className="personnel-option loading">No suppliers found</div>
+                  )}
+                </div>
+              )}
+            </div>
             {errors.supplier && <span className="error-message">{errors.supplier}</span>}
           </div>
 

@@ -142,7 +142,8 @@ const searchUsers = async (req, res) => {
       query.$or = [
         { firstName: { $regex: search, $options: 'i' } },
         { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { email: { $regex: search, $options: 'i' } },
+        { rank: { $regex: search, $options: 'i' } }
       ];
     }
     
@@ -155,7 +156,10 @@ const searchUsers = async (req, res) => {
       .sort({ lastName: 1, firstName: 1 })
       .limit(50);
 
-    res.json(users);
+    res.json({
+      data: users,
+      count: users.length
+    });
   } catch (error) {
     res.status(500).json({ message: 'Search failed', error: error.message });
   }
@@ -168,7 +172,10 @@ const getAllUsers = async (req, res) => {
       .select('firstName lastName email rank department base role createdAt')
       .sort({ createdAt: -1 });
 
-    res.json(users);
+    res.json({
+      data: users,
+      count: users.length
+    });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch users', error: error.message });
   }

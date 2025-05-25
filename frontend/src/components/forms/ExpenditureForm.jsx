@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
-import { expenditureService } from '../../services/api';
+import { useCreateExpenditure, useUpdateExpenditure } from '../../hooks/useQueries';
 import './Forms.css';
 
 const ExpenditureForm = ({ onClose, onSuccess, editData = null }) => {
   const { user } = useAuth();
   const isEdit = !!editData;
   
+  const createExpenditureMutation = useCreateExpenditure();
+  const updateExpenditureMutation = useUpdateExpenditure();
+
   const [formData, setFormData] = useState({
     category: editData?.category || '',
     amount: editData?.amount || '',
@@ -21,7 +24,7 @@ const ExpenditureForm = ({ onClose, onSuccess, editData = null }) => {
   });
 
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
+  const loading = createExpenditureMutation.isPending || updateExpenditureMutation.isPending;
 
   const validateForm = () => {
     const newErrors = {};
@@ -58,38 +61,33 @@ const ExpenditureForm = ({ onClose, onSuccess, editData = null }) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    setLoading(true);
     try {
       const submissionData = {
-        category: formData.category,
+        ...formData,
         amount: parseFloat(formData.amount),
-        description: formData.description,
-        department: formData.department,
-        paymentMethod: formData.paymentMethod,
         budgetYear: parseInt(formData.budgetYear),
-        quarter: parseInt(formData.quarter),
-        receiptNumber: formData.receiptNumber,
-        notes: formData.notes
+        quarter: parseInt(formData.quarter)
       };
 
       if (isEdit) {
-        await expenditureService.updateExpenditure(editData._id || editData.id, submissionData);
+        await updateExpenditureMutation.mutateAsync({ 
+          id: editData._id || editData.id, 
+          data: submissionData 
+        });
         toast.success('Expenditure updated successfully');
       } else {
-        await expenditureService.createExpenditure(submissionData);
-        toast.success('Expenditure recorded successfully');
+        await createExpenditureMutation.mutateAsync(submissionData);
+        toast.success('Expenditure created successfully');
       }
 
-      onSuccess?.(); // Call success callback
-      onClose?.(); // Close the form
+      onSuccess?.();
+      onClose?.();
     } catch (error) {
       console.error('Error submitting expenditure:', error);
       const errorMessage = error.response?.data?.message || 
                           error.response?.data?.error || 
                           'An error occurred while submitting the expenditure';
       toast.error(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
