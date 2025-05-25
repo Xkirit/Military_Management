@@ -55,13 +55,13 @@ app.get('/health', (req, res) => {
 
 // Connect to MongoDB with serverless-friendly options
 const connectDB = async () => {
-  if (mongoose.connections[0].readyState) {
-    return;
+  if (mongoose.connections[0].readyState === 1) {
+    return mongoose.connections[0];
   }
   
   try {
-    await mongoose.connect(process.env.MONGODB_URI, {
-      bufferCommands: false,
+    const connection = await mongoose.connect(process.env.MONGODB_URI, {
+      bufferCommands: true, // Enable buffering for serverless
       bufferMaxEntries: 0,
       useNewUrlParser: true,
       useUnifiedTopology: true,
@@ -70,20 +70,27 @@ const connectDB = async () => {
       socketTimeoutMS: 45000,
     });
     console.log('Connected to MongoDB');
+    return connection;
   } catch (error) {
     console.error('MongoDB connection error:', error);
+    throw error;
   }
 };
 
-// Initialize connection
-connectDB();
-
 // Middleware to ensure DB connection
 app.use(async (req, res, next) => {
-  if (mongoose.connections[0].readyState !== 1) {
-    await connectDB();
+  try {
+    if (mongoose.connections[0].readyState !== 1) {
+      await connectDB();
+    }
+    next();
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    res.status(500).json({ 
+      message: 'Database connection failed', 
+      error: error.message 
+    });
   }
-  next();
 });
 
 // Routes
