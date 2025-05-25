@@ -9,19 +9,13 @@ exports.getMetrics = async (req, res) => {
     const { base, role } = req.user;
     const userBase = base;
 
-    console.log(`Dashboard Debug - User: ${role} from ${userBase}`);
-
     let baseQuery, transferQuery, userIds;
 
     if (role === 'Admin') {
-      // Admin sees data from ALL bases
-      console.log('Dashboard Debug - Admin user, fetching data from all bases');
-      baseQuery = {}; // No base restriction
-      transferQuery = {}; // No base restriction for transfers
+      baseQuery = {};
+      transferQuery = {};
       userIds = await User.find({}).select('_id');
     } else {
-      // Base Commander and Logistics Officer see only their base data
-      console.log(`Dashboard Debug - ${role} user, fetching data from base: ${userBase}`);
       const baseUserIds = await User.find({ base: userBase }).select('_id');
       userIds = baseUserIds;
       baseQuery = { requestedBy: { $in: baseUserIds.map(user => user._id) } };
@@ -194,20 +188,20 @@ exports.getMetrics = async (req, res) => {
         ])
     ]);
 
-    // Calculate net movement values for the base
+    
     const totalOutflowValue = transfersOut.reduce((sum, transfer) => sum + (transfer.totalValue || 0), 0);
     const totalInflowValue = transfersIn.reduce((sum, transfer) => sum + (transfer.totalValue || 0), 0);
     
-    // Include purchases as inflow (materials coming into the system)
+    
     const purchaseInflowValue = purchases.reduce((sum, purchase) => {
       return sum + (purchase.quantity * purchase.unitPrice);
     }, 0);
     
-    // Total inflow = transfers coming in + purchases
+    
     const totalSystemInflowValue = totalInflowValue + purchaseInflowValue;
     const netBalance = totalSystemInflowValue - totalOutflowValue;
 
-    console.log(`Dashboard Debug - Transfer inflow: $${totalInflowValue}, Purchase inflow: $${purchaseInflowValue}, Transfer outflow: $${totalOutflowValue}, Net balance: $${netBalance}`);
+
 
     const totalExpenditures = purchases.reduce((sum, purchase) => {
       return sum + (purchase.quantity * purchase.unitPrice);
@@ -281,7 +275,6 @@ exports.getMetrics = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching metrics:', error);
     res.status(500).json({
       message: 'Error fetching dashboard metrics',
       error: error.message
@@ -395,7 +388,6 @@ exports.getRecentActivities = async (req, res) => {
     
     res.status(200).json(activities.slice(0, limit));
   } catch (error) {
-    console.error('Error fetching recent activities:', error);
     res.status(500).json({
       message: 'Error fetching recent activities',
       error: error.message
@@ -407,28 +399,19 @@ exports.getNetMovementDetails = async (req, res) => {
   try {
     const { base, role } = req.user;
     const userBase = base;
-    
-    console.log(`NetMovement Debug - User: ${role} from ${userBase}`);
 
     let userIds, purchaseQuery, transferQuery;
 
     if (role === 'Admin') {
-      // Admin sees net movement details from ALL bases
-      console.log('NetMovement Debug - Admin user, fetching data from all bases');
       userIds = await User.find({}).select('_id');
       purchaseQuery = {};
       transferQuery = {};
     } else {
-      // Base Commander and Logistics Officer see only their base data
-      console.log(`NetMovement Debug - ${role} user, fetching data for base: ${userBase}`);
       const baseUserIds = await User.find({ base: userBase }).select('_id');
       userIds = baseUserIds;
       purchaseQuery = { requestedBy: { $in: baseUserIds.map(user => user._id) } };
       transferQuery = { $or: [{ sourceBaseId: userBase }, { destinationBaseId: userBase }] };
     }
-
-    console.log('NetMovement Debug - Purchase filter:', purchaseQuery);
-    console.log('NetMovement Debug - Transfer filter:', transferQuery);
 
     const [purchases, transfersOut, transfersIn] = await Promise.all([
       Purchase.aggregate([
@@ -449,7 +432,7 @@ exports.getNetMovementDetails = async (req, res) => {
       ]),
       role === 'Admin' ?
         Transfer.aggregate([
-          { $match: {} }, // Admin sees all outgoing transfers
+          { $match: {} },
           {
             $lookup: {
               from: 'users',
@@ -534,7 +517,7 @@ exports.getNetMovementDetails = async (req, res) => {
         ]),
       role === 'Admin' ?
         Transfer.aggregate([
-          { $match: {} }, // Admin sees all incoming transfers
+          { $match: {} },
           {
             $lookup: {
               from: 'users',
@@ -671,7 +654,7 @@ exports.getNetMovementDetails = async (req, res) => {
     const inflowValue = inflow.reduce((sum, item) => sum + item.amount, 0);
     const outflowValue = outflow.reduce((sum, item) => sum + item.amount, 0);
 
-    console.log(`NetMovement Debug - Found ${purchases.length} purchases, ${transfersOut.length} outbound transfers, ${transfersIn.length} inbound transfers`);
+
 
     res.status(200).json({
       base: role === 'Admin' ? 'All Bases' : userBase,
@@ -689,7 +672,6 @@ exports.getNetMovementDetails = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching net movement details:', error);
     res.status(500).json({
       message: 'Error fetching net movement details',
       error: error.message

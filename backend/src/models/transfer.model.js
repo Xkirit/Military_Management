@@ -33,7 +33,7 @@ const transferSchema = new mongoose.Schema({
   },
   equipmentId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Purchase' // Reference to the equipment being transferred
+    ref: 'Purchase' 
   },
   reason: {
     type: String,
@@ -72,7 +72,7 @@ const transferSchema = new mongoose.Schema({
     trim: true
   },
   attachments: [{
-    type: String // URLs to attached files
+    type: String 
   }],
   createdAt: {
     type: Date,
@@ -84,7 +84,7 @@ const transferSchema = new mongoose.Schema({
   }
 });
 
-// Update the updatedAt timestamp before saving
+
 transferSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();

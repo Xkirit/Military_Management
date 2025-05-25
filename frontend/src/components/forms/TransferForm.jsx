@@ -66,7 +66,6 @@ const TransferForm = ({ onClose, onSuccess, editData = null }) => {
       });
       setAvailableEquipment(response.data);
     } catch (error) {
-      console.error('Error searching equipment:', error);
       // Don't show error toast for equipment search as it's optional
     } finally {
       setEquipmentLoading(false);
@@ -218,7 +217,6 @@ const TransferForm = ({ onClose, onSuccess, editData = null }) => {
       onSuccess?.();
       onClose?.();
     } catch (error) {
-      console.error('Error submitting transfer:', error);
       const errorMessage = error.response?.data?.message || 
                           error.response?.data?.error || 
                           'An error occurred while submitting the transfer';

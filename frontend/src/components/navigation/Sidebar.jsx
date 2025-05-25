@@ -23,9 +23,6 @@ const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  console.log('Sidebar Debug - User object:', user);
-  console.log('Sidebar Debug - User properties:', user ? Object.keys(user) : 'User is null/undefined');
-  console.log('Sidebar Debug - Is Logistics Officer:', isLogisticsOfficer());
 
   // Check if screen is mobile size
   useEffect(() => {

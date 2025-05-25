@@ -1,12 +1,12 @@
 const Transfer = require('../models/transfer.model');
 const mongoose = require('mongoose');
 
-// Create a new transfer
+
 exports.createTransfer = async (req, res) => {
   try {
     const transfer = new Transfer({
       ...req.body,
-      requestedBy: req.user._id // From auth middleware
+      requestedBy: req.user._id 
     });
     
     const savedTransfer = await transfer.save();
@@ -19,27 +19,24 @@ exports.createTransfer = async (req, res) => {
   }
 };
 
-// Get all transfers
+
 exports.getAllTransfers = async (req, res) => {
   try {
-    const userBase = req.user.base; // Get user's base from authenticated user
+    const userBase = req.user.base; 
     const userRole = req.user.role;
     
-    console.log(`Transfer Debug - User: ${userRole} from ${userBase}`);
     
     let baseTransferQuery;
     
     if (userRole === 'Admin') {
-      // Admin sees ALL transfers from all bases
-      console.log('Transfer Debug - Admin user, fetching all transfers');
-      baseTransferQuery = {}; // No base restriction
+      
+      baseTransferQuery = {}; 
     } else {
-      // Base Commander and Logistics Officer see transfers involving their base
-      console.log(`Transfer Debug - ${userRole} user, fetching transfers for base: ${userBase}`);
+      
       baseTransferQuery = {
         $or: [
-          { sourceBaseId: userBase },      // Outgoing transfers (from user's base)
-          { destinationBaseId: userBase }  // Incoming transfers (to user's base)
+          { sourceBaseId: userBase },      
+          { destinationBaseId: userBase }  
         ]
       };
     }
@@ -49,11 +46,9 @@ exports.getAllTransfers = async (req, res) => {
       .populate('approvedBy', 'firstName lastName role base')
       .sort({ createdAt: -1 });
     
-    console.log(`Transfer Debug - Found ${transfers.length} transfers`);
     
     res.status(200).json(transfers);
   } catch (error) {
-    console.error('Transfer Debug - Error:', error);
     res.status(500).json({
       message: 'Error fetching transfers',
       error: error.message
@@ -61,7 +56,7 @@ exports.getAllTransfers = async (req, res) => {
   }
 };
 
-// Get transfer by ID
+
 exports.getTransferById = async (req, res) => {
   try {
     const transfer = await Transfer.findById(req.params.id)
@@ -81,7 +76,7 @@ exports.getTransferById = async (req, res) => {
   }
 };
 
-// Update transfer
+
 exports.updateTransfer = async (req, res) => {
   try {
     const transfer = await Transfer.findById(req.params.id);
@@ -90,7 +85,7 @@ exports.updateTransfer = async (req, res) => {
       return res.status(404).json({ message: 'Transfer not found' });
     }
 
-    // Only allow updates if transfer is not completed
+    
     if (transfer.status === 'Completed') {
       return res.status(400).json({ message: 'Cannot update completed transfer' });
     }
@@ -110,7 +105,7 @@ exports.updateTransfer = async (req, res) => {
   }
 };
 
-// Delete transfer
+
 exports.deleteTransfer = async (req, res) => {
   try {
     const transfer = await Transfer.findById(req.params.id);
@@ -119,7 +114,7 @@ exports.deleteTransfer = async (req, res) => {
       return res.status(404).json({ message: 'Transfer not found' });
     }
 
-    // Only allow deletion if transfer is pending
+    
     if (transfer.status !== 'Pending') {
       return res.status(400).json({ message: 'Can only delete pending transfers' });
     }
@@ -134,7 +129,7 @@ exports.deleteTransfer = async (req, res) => {
   }
 };
 
-// Update transfer status
+
 exports.updateStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -144,14 +139,14 @@ exports.updateStatus = async (req, res) => {
       return res.status(404).json({ message: 'Transfer not found' });
     }
 
-    // Allow most transitions except changing from Completed
+    
     if (transfer.status === 'Completed' && status !== 'Completed') {
       return res.status(400).json({ 
         message: 'Cannot change status of completed transfer' 
       });
     }
 
-    // Validate that status is one of the allowed values
+    
     const allowedStatuses = ['Pending', 'In Transit', 'Completed', 'Cancelled'];
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ 

@@ -51,7 +51,7 @@ const expenditureSchema = new mongoose.Schema({
     max: 4
   },
   attachments: [{
-    type: String // URLs to attached files
+    type: String 
   }],
   notes: {
     type: String,
@@ -67,18 +67,18 @@ const expenditureSchema = new mongoose.Schema({
   }
 });
 
-// Update the updatedAt timestamp before saving
+
 expenditureSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
 
-// Virtual for total amount with tax
+
 expenditureSchema.virtual('totalAmount').get(function() {
-  return this.amount * 1.1; // Assuming 10% tax
+  return this.amount * 1.1; 
 });
 
-// Enable virtuals in JSON
+
 expenditureSchema.set('toJSON', { virtuals: true });
 expenditureSchema.set('toObject', { virtuals: true });
 

@@ -27,15 +27,8 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
   // Ensure searchResults is always an array
   const safeSearchResults = Array.isArray(searchResults) ? searchResults : [];
 
-  // Debug React Query state (can be removed in production)
   useEffect(() => {
-    console.log('React Query Debug:', {
-      personnelSearchTerm,
-      searchResults: safeSearchResults.length,
-      searchLoading,
-      searchError: searchError?.message,
-      searchEnabled
-    });
+    // React Query state monitoring for personnel search
   }, [personnelSearchTerm, safeSearchResults, searchLoading, searchError, searchEnabled]);
 
   // Refs for click outside detection
@@ -95,7 +88,6 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
   // Handle search errors
   useEffect(() => {
     if (searchError) {
-      console.error('Personnel search error:', searchError);
       toast.error('Failed to search personnel: ' + (searchError.response?.data?.message || searchError.message));
     }
   }, [searchError]);
@@ -110,7 +102,6 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
       });
       setAvailableEquipment(response.data);
     } catch (error) {
-      console.error('Error searching equipment:', error);
       toast.error('Failed to search equipment: ' + (error.response?.data?.message || error.message));
     } finally {
       setEquipmentLoading(false);
@@ -261,7 +252,6 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
       onSuccess?.();
       onClose?.();
     } catch (error) {
-      console.error('Error submitting assignment:', error);
       const errorMessage = error.response?.data?.message || 
                           error.response?.data?.error || 
                           'An error occurred while submitting the assignment';

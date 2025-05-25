@@ -64,7 +64,7 @@ const assignmentSchema = new mongoose.Schema({
     default: ''
   },
   attachments: [{
-    type: String // URLs to attached files
+    type: String 
   }],
   createdAt: {
     type: Date,
@@ -76,13 +76,13 @@ const assignmentSchema = new mongoose.Schema({
   }
 });
 
-// Update the updatedAt timestamp before saving
+
 assignmentSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
 
-// Post save hook to update equipment availability
+
 assignmentSchema.post('save', async function(doc) {
   if (doc.equipmentPurchase && doc.equipmentQuantity > 0) {
     try {
@@ -97,7 +97,7 @@ assignmentSchema.post('save', async function(doc) {
   }
 });
 
-// Pre remove hook to restore equipment availability when assignment is deleted
+
 assignmentSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
   if (this.equipmentPurchase && this.equipmentQuantity > 0) {
     try {

@@ -71,7 +71,7 @@ const purchaseSchema = new mongoose.Schema({
     trim: true
   },
   attachments: [{
-    type: String // URLs to attached files
+    type: String 
   }],
   createdAt: {
     type: Date,
@@ -83,18 +83,18 @@ const purchaseSchema = new mongoose.Schema({
   }
 });
 
-// Update the updatedAt timestamp before saving
+
 purchaseSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
 
-// Virtual for date field (for compatibility)
+
 purchaseSchema.virtual('date').get(function() {
   return this.createdAt;
 });
 
-// Ensure virtual fields are serialized
+
 purchaseSchema.set('toJSON', { virtuals: true });
 
 const Purchase = mongoose.model('Purchase', purchaseSchema);

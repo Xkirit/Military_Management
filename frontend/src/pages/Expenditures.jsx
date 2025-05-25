@@ -33,7 +33,6 @@ const Expenditures = () => {
   // Handle API errors
   React.useEffect(() => {
     if (error) {
-      console.error('Error fetching expenditures:', error);
       toast.error('Failed to fetch expenditures');
     }
   }, [error]);
@@ -72,7 +71,6 @@ const Expenditures = () => {
         toast.success('Expenditure deleted successfully');
         // Data will automatically refresh due to query invalidation
       } catch (error) {
-        console.error('Error deleting expenditure:', error);
         const errorMessage = error.response?.data?.message || 
                             error.response?.data?.error || 
                             'Failed to delete expenditure';

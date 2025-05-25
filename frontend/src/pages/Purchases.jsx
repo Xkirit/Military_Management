@@ -33,7 +33,6 @@ const Purchases = () => {
   // Handle API errors
   React.useEffect(() => {
     if (error) {
-      console.error('Error fetching purchases:', error);
       toast.error('Failed to fetch purchases');
     }
   }, [error]);
@@ -58,7 +57,6 @@ const Purchases = () => {
         toast.success('Purchase deleted successfully');
         // Data will automatically refresh due to query invalidation
       } catch (error) {
-        console.error('Error deleting purchase:', error);
         const errorMessage = error.response?.data?.message || 
                             error.response?.data?.error || 
                             'Failed to delete purchase';
@@ -77,7 +75,6 @@ const Purchases = () => {
       toast.success('Purchase status updated successfully');
       // Data will automatically refresh due to query invalidation
     } catch (error) {
-      console.error('Error updating purchase status:', error);
       const errorMessage = error.response?.data?.message || 
                           error.response?.data?.error || 
                           'Failed to update purchase status';

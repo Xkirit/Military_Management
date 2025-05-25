@@ -8,10 +8,10 @@ const {
 } = require('../controllers/dashboard.controller');
 const { protect } = require('../middleware/auth.middleware');
 
-// Protected routes
+
 router.use(protect);
 
-// Dashboard routes
+
 router.get('/metrics', getMetrics);
 router.get('/departments', getDepartmentSummary);
 router.get('/activities', getRecentActivities);

@@ -39,7 +39,6 @@ const Transfers = () => {
   // Handle API errors
   React.useEffect(() => {
     if (error) {
-      console.error('Error fetching transfers:', error);
       toast.error('Failed to fetch transfers');
     }
   }, [error]);
@@ -93,7 +92,6 @@ const Transfers = () => {
         toast.success('Transfer deleted successfully');
         // Data will automatically refresh due to query invalidation
       } catch (error) {
-        console.error('Error deleting transfer:', error);
         const errorMessage = error.response?.data?.message || 
                             error.response?.data?.error || 
                             'Failed to delete transfer';
@@ -112,7 +110,6 @@ const Transfers = () => {
       toast.success('Transfer status updated successfully');
       // Data will automatically refresh due to query invalidation
     } catch (error) {
-      console.error('Error updating transfer status:', error);
       const errorMessage = error.response?.data?.message || 
                           error.response?.data?.error || 
                           'Failed to update transfer status';

@@ -1,7 +1,6 @@
 const Assignment = require('../models/assignment.model');
 const Purchase = require('../models/purchase.model');
 
-// Create a new assignment
 exports.createAssignment = async (req, res) => {
   try {
     const assignment = new Assignment({
@@ -21,29 +20,20 @@ exports.createAssignment = async (req, res) => {
   }
 };
 
-// Get all assignments
 exports.getAllAssignments = async (req, res) => {
   try {
     const userRole = req.user.role;
     const userBase = req.user.base;
     
-    console.log(`Assignment Debug - User: ${userRole} from ${userBase}`);
-    
     let filter = {};
     
     if (userRole === 'Admin') {
-      // Admin sees ALL assignments from all bases
-      console.log('Assignment Debug - Admin user, fetching all assignments');
-      filter = {}; // No base restriction
+      filter = {};
     } else {
-      // Base Commander and Logistics Officer see only assignments from their base
-      console.log(`Assignment Debug - ${userRole} user, fetching assignments for base: ${userBase}`);
       const User = require('../models/user.model');
       const baseUserIds = await User.find({ base: userBase }).select('_id');
       filter = { assignedBy: { $in: baseUserIds.map(user => user._id) } };
     }
-    
-    console.log('Assignment Debug - Filter applied:', filter);
     
     const assignments = await Assignment.find(filter)
       .populate('personnel', 'firstName lastName rank department base')
@@ -51,11 +41,8 @@ exports.getAllAssignments = async (req, res) => {
       .populate('equipmentPurchase', 'item category unitPrice')
       .sort({ createdAt: -1 });
     
-    console.log(`Assignment Debug - Found ${assignments.length} assignments`);
-    
     res.status(200).json(assignments);
   } catch (error) {
-    console.error('Assignment Debug - Error:', error);
     res.status(500).json({
       message: 'Error fetching assignments',
       error: error.message
@@ -63,7 +50,6 @@ exports.getAllAssignments = async (req, res) => {
   }
 };
 
-// Get assignment by ID
 exports.getAssignmentById = async (req, res) => {
   try {
     const assignment = await Assignment.findById(req.params.id)
@@ -84,7 +70,6 @@ exports.getAssignmentById = async (req, res) => {
   }
 };
 
-// Get assignments by personnel
 exports.getAssignmentsByPersonnel = async (req, res) => {
   try {
     const assignments = await Assignment.find({ personnel: req.params.personnelId })
@@ -102,7 +87,6 @@ exports.getAssignmentsByPersonnel = async (req, res) => {
   }
 };
 
-// Update assignment
 exports.updateAssignment = async (req, res) => {
   try {
     const assignment = await Assignment.findById(req.params.id);
@@ -132,7 +116,6 @@ exports.updateAssignment = async (req, res) => {
   }
 };
 
-// Delete assignment
 exports.deleteAssignment = async (req, res) => {
   try {
     const assignment = await Assignment.findById(req.params.id);
@@ -155,7 +138,6 @@ exports.deleteAssignment = async (req, res) => {
   }
 };
 
-// Update assignment status
 exports.updateStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -178,21 +160,17 @@ exports.updateStatus = async (req, res) => {
       });
     }
 
-    // Equipment return logic when assignment is completed
     if (status === 'Completed' && assignment.equipmentPurchase && assignment.equipmentQuantity > 0) {
       try {
         const purchase = await Purchase.findById(assignment.equipmentPurchase);
         if (purchase) {
           purchase.quantityAvailable = (purchase.quantityAvailable || 0) + assignment.equipmentQuantity;
           await purchase.save();
-          console.log(`Returned ${assignment.equipmentQuantity} units of ${purchase.item} to inventory`);
         }
       } catch (equipmentError) {
-        console.error('Error returning equipment to inventory:', equipmentError);
       }
     }
 
-    // Equipment allocation logic when assignment becomes active
     if (status === 'Active' && assignment.equipmentPurchase && assignment.equipmentQuantity > 0) {
       try {
         const purchase = await Purchase.findById(assignment.equipmentPurchase);
@@ -200,7 +178,6 @@ exports.updateStatus = async (req, res) => {
           if (purchase.quantityAvailable >= assignment.equipmentQuantity) {
             purchase.quantityAvailable -= assignment.equipmentQuantity;
             await purchase.save();
-            console.log(`Allocated ${assignment.equipmentQuantity} units of ${purchase.item} from inventory`);
           } else {
             return res.status(400).json({
               message: `Insufficient equipment available. Required: ${assignment.equipmentQuantity}, Available: ${purchase.quantityAvailable}`
@@ -208,7 +185,6 @@ exports.updateStatus = async (req, res) => {
           }
         }
       } catch (equipmentError) {
-        console.error('Error allocating equipment from inventory:', equipmentError);
         return res.status(500).json({
           message: 'Error allocating equipment from inventory',
           error: equipmentError.message

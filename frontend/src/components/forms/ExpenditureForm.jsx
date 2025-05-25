@@ -83,7 +83,6 @@ const ExpenditureForm = ({ onClose, onSuccess, editData = null }) => {
       onSuccess?.();
       onClose?.();
     } catch (error) {
-      console.error('Error submitting expenditure:', error);
       const errorMessage = error.response?.data?.message || 
                           error.response?.data?.error || 
                           'An error occurred while submitting the expenditure';

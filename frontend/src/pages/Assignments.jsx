@@ -34,7 +34,6 @@ const Assignments = () => {
   // Handle API errors
   React.useEffect(() => {
     if (error) {
-      console.error('Error fetching assignments:', error);
       toast.error('Failed to fetch assignments');
     }
   }, [error]);
@@ -80,7 +79,6 @@ const Assignments = () => {
         toast.success('Assignment deleted successfully');
         // Data will automatically refresh due to query invalidation
       } catch (error) {
-        console.error('Error deleting assignment:', error);
         const errorMessage = error.response?.data?.message || 
                             error.response?.data?.error || 
                             'Failed to delete assignment';
@@ -99,7 +97,6 @@ const Assignments = () => {
       toast.success('Assignment status updated successfully');
       // Data will automatically refresh due to query invalidation
     } catch (error) {
-      console.error('Error updating assignment status:', error);
       const errorMessage = error.response?.data?.message || 
                           error.response?.data?.error || 
                           'Failed to update assignment status';

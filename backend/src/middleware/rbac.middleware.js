@@ -5,18 +5,18 @@ const ROLES = {
 };
 
 const PERMISSIONS = {
-  // Dashboard permissions
+  
   VIEW_ALL_BASES_DASHBOARD: 'view_all_bases_dashboard',
   VIEW_BASE_DASHBOARD: 'view_base_dashboard',
   
-  // User/Personnel permissions
+  
   VIEW_ALL_USERS: 'view_all_users',
   VIEW_BASE_USERS: 'view_base_users',
   CREATE_USER: 'create_user',
   UPDATE_USER: 'update_user',
   DELETE_USER: 'delete_user',
   
-  // Purchase permissions
+  
   VIEW_ALL_PURCHASES: 'view_all_purchases',
   VIEW_BASE_PURCHASES: 'view_base_purchases',
   CREATE_PURCHASE: 'create_purchase',
@@ -26,7 +26,7 @@ const PERMISSIONS = {
   DELETE_ANY_PURCHASE: 'delete_any_purchase',
   APPROVE_PURCHASE: 'approve_purchase',
   
-  // Transfer permissions
+  
   VIEW_ALL_TRANSFERS: 'view_all_transfers',
   VIEW_BASE_TRANSFERS: 'view_base_transfers',
   CREATE_TRANSFER: 'create_transfer',
@@ -36,7 +36,7 @@ const PERMISSIONS = {
   DELETE_ANY_TRANSFER: 'delete_any_transfer',
   APPROVE_TRANSFER: 'approve_transfer',
   
-  // Assignment permissions
+  
   VIEW_ALL_ASSIGNMENTS: 'view_all_assignments',
   VIEW_BASE_ASSIGNMENTS: 'view_base_assignments',
   CREATE_ASSIGNMENT: 'create_assignment',
@@ -46,7 +46,7 @@ const PERMISSIONS = {
   DELETE_ANY_ASSIGNMENT: 'delete_any_assignment',
   APPROVE_ASSIGNMENT: 'approve_assignment',
   
-  // Expenditure permissions
+  
   VIEW_ALL_EXPENDITURES: 'view_all_expenditures',
   VIEW_BASE_EXPENDITURES: 'view_base_expenditures',
   CREATE_EXPENDITURE: 'create_expenditure',
@@ -55,7 +55,7 @@ const PERMISSIONS = {
   DELETE_OWN_EXPENDITURE: 'delete_own_expenditure',
   DELETE_ANY_EXPENDITURE: 'delete_any_expenditure',
   
-  // System permissions
+  
   ACCESS_ADMIN_PANEL: 'access_admin_panel',
   VIEW_SYSTEM_REPORTS: 'view_system_reports',
   EXPORT_DATA: 'export_data'
@@ -63,7 +63,7 @@ const PERMISSIONS = {
 
 const ROLE_PERMISSIONS = {
   [ROLES.ADMIN]: [
-    // Admin has full access to everything
+    
     PERMISSIONS.VIEW_ALL_BASES_DASHBOARD,
     PERMISSIONS.VIEW_ALL_USERS,
     PERMISSIONS.CREATE_USER,
@@ -94,7 +94,7 @@ const ROLE_PERMISSIONS = {
   ],
   
   [ROLES.BASE_COMMANDER]: [
-    // Base Commander has full access to their base
+    
     PERMISSIONS.VIEW_BASE_DASHBOARD,
     PERMISSIONS.VIEW_BASE_USERS,
     PERMISSIONS.CREATE_USER,
@@ -122,7 +122,7 @@ const ROLE_PERMISSIONS = {
   ],
   
   [ROLES.LOGISTICS_OFFICER]: [
-    // Logistics Officer has limited access, mainly to purchases and transfers
+    
     PERMISSIONS.VIEW_BASE_DASHBOARD,
     PERMISSIONS.VIEW_BASE_USERS,
     PERMISSIONS.VIEW_BASE_PURCHASES,
@@ -141,24 +141,24 @@ const ROLE_PERMISSIONS = {
   ]
 };
 
-// Helper function to check if a role has a specific permission
+
 const hasPermission = (userRole, permission) => {
   const rolePermissions = ROLE_PERMISSIONS[userRole] || [];
   return rolePermissions.includes(permission);
 };
 
-// Helper function to check if a user can perform an action on a resource
+
 const canUserPerformAction = (user, permission, resourceOwner = null) => {
   if (!user || !user.role) return false;
   
   const userPermissions = ROLE_PERMISSIONS[user.role] || [];
   
-  // Check if user has the general permission
+  
   if (userPermissions.includes(permission)) {
     return true;
   }
   
-  // Check for "own" permissions when user is the resource owner
+  
   if (resourceOwner && user._id.toString() === resourceOwner.toString()) {
     const ownPermission = permission.replace('_any_', '_own_');
     if (userPermissions.includes(ownPermission)) {
@@ -169,7 +169,7 @@ const canUserPerformAction = (user, permission, resourceOwner = null) => {
   return false;
 };
 
-// Middleware to check permissions
+
 const checkPermission = (permission) => {
   return (req, res, next) => {
     try {
@@ -194,7 +194,7 @@ const checkPermission = (permission) => {
   };
 };
 
-// Middleware to check role-based access
+
 const requireRole = (allowedRoles) => {
   return (req, res, next) => {
     try {
@@ -219,7 +219,7 @@ const requireRole = (allowedRoles) => {
   };
 };
 
-// Middleware to check if user can access resource
+
 const checkResourceAccess = (permission, getResourceOwner) => {
   return async (req, res, next) => {
     try {
@@ -246,7 +246,7 @@ const checkResourceAccess = (permission, getResourceOwner) => {
   };
 };
 
-// Middleware to filter data based on user scope
+
 const applyDataFilter = (req, res, next) => {
   const user = req.user;
   
@@ -254,24 +254,24 @@ const applyDataFilter = (req, res, next) => {
     return res.status(401).json({ message: 'Authentication required' });
   }
 
-  // Admin can see all data
+  
   if (user.role === ROLES.ADMIN) {
     req.dataFilter = {};
     return next();
   }
 
-  // Base Commander and Logistics Officer can only see their base data
+  
   if (user.role === ROLES.BASE_COMMANDER || user.role === ROLES.LOGISTICS_OFFICER) {
     req.dataFilter = { base: user.base };
     return next();
   }
 
-  // Default: no data access
+  
   req.dataFilter = { _id: null };
   next();
 };
 
-// Convenience middleware functions
+
 const adminOnly = requireRole([ROLES.ADMIN]);
 const commandersAndAbove = requireRole([ROLES.ADMIN, ROLES.BASE_COMMANDER]);
 const allRoles = requireRole([ROLES.ADMIN, ROLES.BASE_COMMANDER, ROLES.LOGISTICS_OFFICER]);

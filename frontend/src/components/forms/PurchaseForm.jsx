@@ -94,7 +94,6 @@ const PurchaseForm = ({ onClose, onSuccess, editData = null }) => {
       });
       setAvailableItems(response.data);
     } catch (error) {
-      console.error('Error searching items:', error);
       // Don't show error toast as this is optional
     } finally {
       setItemSearchLoading(false);
@@ -245,7 +244,6 @@ const PurchaseForm = ({ onClose, onSuccess, editData = null }) => {
       onSuccess?.();
       onClose?.();
     } catch (error) {
-      console.error('Error submitting purchase:', error);
       const errorMessage = error.response?.data?.message || 
                           error.response?.data?.error || 
                           'An error occurred while submitting the purchase';

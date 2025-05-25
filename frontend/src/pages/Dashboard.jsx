@@ -33,8 +33,6 @@ const Dashboard = () => {
     getBaseDisplayName 
   } = usePermissions();
   
-  console.log('Dashboard Debug - User:', user);
-  console.log('Dashboard Debug - API URL:', import.meta.env.VITE_API_URL || 'http://localhost:5003/api');
   
   const [filters, setFilters] = useState({ department: '' });
   const [showNetMovement, setShowNetMovement] = useState(false);
@@ -77,30 +75,23 @@ const Dashboard = () => {
   // Handle any API errors
   React.useEffect(() => {
     if (metricsError) {
-      console.error('Dashboard Debug - Error fetching metrics:', metricsError);
       toast.error(`Failed to fetch dashboard metrics: ${metricsError.response?.data?.message || metricsError.message}`);
     }
     if (activitiesError) {
-      console.error('Dashboard Debug - Error fetching activities:', activitiesError);
       toast.error(`Failed to fetch activities: ${activitiesError.response?.data?.message || activitiesError.message}`);
     }
     if (departmentsError) {
-      console.error('Dashboard Debug - Error fetching departments:', departmentsError);
       toast.error(`Failed to fetch departments: ${departmentsError.response?.data?.message || departmentsError.message}`);
     }
   }, [metricsError, activitiesError, departmentsError]);
 
   const handleNetMovementClick = async () => {
     try {
-      console.log('Dashboard Debug - Fetching net movement details...');
       const result = await fetchNetMovementDetails();
       if (result.data) {
-        console.log('Dashboard Debug - Net movement response:', result.data);
         setShowNetMovement(true);
-        console.log('Dashboard Debug - Modal should now be visible');
       }
     } catch (error) {
-      console.error('Dashboard Debug - Error fetching net movement details:', error);
       toast.error('Failed to fetch net movement details');
     }
   };
