@@ -20,7 +20,7 @@ const corsOptions = {
       'http://localhost:5174', 
       'http://localhost:5175',
       'http://localhost:3000',
-      process.env.CLIENT_URL // Your frontend URL on Render
+      process.env.CLIENT_URL // Your frontend URL on Render 
     ].filter(Boolean); // Remove undefined values
     
     if (allowedOrigins.indexOf(origin) !== -1) {
