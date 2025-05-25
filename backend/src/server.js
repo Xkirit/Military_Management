@@ -61,13 +61,10 @@ const connectDB = async () => {
   
   try {
     const connection = await mongoose.connect(process.env.MONGODB_URI, {
-      bufferCommands: true, // Enable buffering for serverless
-      bufferMaxEntries: 0,
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
+      family: 4, // Use IPv4, skip trying IPv6
     });
     console.log('Connected to MongoDB');
     return connection;
