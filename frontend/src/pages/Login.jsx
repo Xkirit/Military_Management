@@ -68,8 +68,34 @@ const Login = () => {
         toast.success('Login successful');
       } catch (error) {
         console.error('Login error:', error);
-        setApiError(error.response?.data?.message || 'Login failed. Please try again.');
-        toast.error('Login failed. Please try again.');
+        
+        // Handle specific error messages
+        let errorMessage = 'Login failed. Please try again.';
+        
+        if (error.response?.status === 401) {
+          const serverMessage = error.response?.data?.message || '';
+          if (serverMessage.includes('Incorrect password')) {
+            errorMessage = 'Incorrect password. Please try again.';
+          } else if (serverMessage.includes('No user found')) {
+            errorMessage = 'Email not found. Please check your email address.';
+          } else {
+            errorMessage = 'Invalid email or password. Please try again.';
+          }
+        } else if (error.response?.status === 400) {
+          const serverMessage = error.response?.data?.message || '';
+          if (serverMessage.includes('email and password')) {
+            errorMessage = 'Please provide both email and password.';
+          } else {
+            errorMessage = serverMessage || 'Invalid login credentials.';
+          }
+        } else if (error.response?.status >= 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else if (error.code === 'NETWORK_ERROR' || !error.response) {
+          errorMessage = 'Network error. Please check your connection.';
+        }
+        
+        setApiError(errorMessage);
+        toast.error(errorMessage);
       } finally {
         setIsLoading(false);
       }
@@ -84,7 +110,7 @@ const Login = () => {
         
         {apiError && (
           <div className="error-alert">
-            {apiError}
+            <strong>⚠️ Error:</strong> {apiError}
           </div>
         )}
 

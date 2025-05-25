@@ -66,6 +66,15 @@
   border-radius: 4px;
   margin-bottom: 1.5rem;
   border: 1px solid #ffcdd2;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  box-shadow: 0 2px 4px rgba(211, 47, 47, 0.1);
+}
+
+.error-alert strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
 }
 
 .login-button {
