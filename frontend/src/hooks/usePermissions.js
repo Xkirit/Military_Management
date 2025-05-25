@@ -82,6 +82,15 @@ export const usePermissions = () => {
            canPerformAction(PERMISSIONS.DELETE_OWN_ASSIGNMENT, assignmentOwner);
   };
 
+  const canUpdateAssignmentStatus = (assignmentOwner) => {
+    // Admin and Base Commander can always update assignment status
+    if (isAdmin() || isBaseCommander()) {
+      return true;
+    }
+    // Otherwise, check if user can update the assignment
+    return canUpdateAssignment(assignmentOwner);
+  };
+
   const canUpdateExpenditure = (expenditureOwner) => {
     return canPerformAction(PERMISSIONS.UPDATE_ANY_EXPENDITURE, expenditureOwner) ||
            canPerformAction(PERMISSIONS.UPDATE_OWN_EXPENDITURE, expenditureOwner);
@@ -140,6 +149,7 @@ export const usePermissions = () => {
     canDeleteTransfer,
     canUpdateAssignment,
     canDeleteAssignment,
+    canUpdateAssignmentStatus,
     canUpdateExpenditure,
     canDeleteExpenditure,
     canAccessAdminPanel,

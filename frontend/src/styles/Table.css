@@ -361,6 +361,37 @@
   box-shadow: 0 0 0 3px rgba(101, 119, 234, 0.1);
 }
 
+/* Status Badge Styles */
+.status-badge {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.status-badge.status-active {
+  background: var(--success);
+  color: var(--white);
+}
+
+.status-badge.status-pending {
+  background: var(--warning);
+  color: var(--white);
+}
+
+.status-badge.status-completed {
+  background: var(--info);
+  color: var(--white);
+}
+
+.status-badge.status-cancelled {
+  background: var(--danger);
+  color: var(--white);
+}
+
 /* Action Buttons */
 .action-buttons {
   display: flex;

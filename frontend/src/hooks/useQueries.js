@@ -263,5 +263,10 @@ export const useUsers = (params = {}) => {
     queryKey: [QUERY_KEYS.USERS, params],
     queryFn: () => authService.searchUsers(params),
     select: (response) => response.data,
+    enabled: !!params.search && params.search.length >= 2, // Only run when search has at least 2 characters
+    staleTime: 30000, // Cache for 30 seconds
+    cacheTime: 300000, // Keep in cache for 5 minutes
+    retry: 1, // Only retry once on failure
+    refetchOnWindowFocus: false, // Don't refetch when window gains focus
   });
 }; 

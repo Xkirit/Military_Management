@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCreateAssignment, useUpdateAssignment } from '../../hooks/useQueries';
-import { purchaseService, authService } from '../../services/api';
+import { useCreateAssignment, useUpdateAssignment, useUsers } from '../../hooks/useQueries';
+import { purchaseService } from '../../services/api';
 import './Forms.css';
 
 const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
@@ -11,6 +11,32 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
   
   const createAssignmentMutation = useCreateAssignment();
   const updateAssignmentMutation = useUpdateAssignment();
+
+  // Personnel search with React Query
+  const [personnelSearchTerm, setPersonnelSearchTerm] = useState('');
+  const { 
+    data: searchResults, 
+    isLoading: searchLoading, 
+    error: searchError,
+    isEnabled: searchEnabled
+  } = useUsers({ 
+    search: personnelSearchTerm,
+    limit: 20 
+  });
+
+  // Ensure searchResults is always an array
+  const safeSearchResults = Array.isArray(searchResults) ? searchResults : [];
+
+  // Debug React Query state (can be removed in production)
+  useEffect(() => {
+    console.log('React Query Debug:', {
+      personnelSearchTerm,
+      searchResults: safeSearchResults.length,
+      searchLoading,
+      searchError: searchError?.message,
+      searchEnabled
+    });
+  }, [personnelSearchTerm, safeSearchResults, searchLoading, searchError, searchEnabled]);
 
   // Refs for click outside detection
   const personnelDropdownRef = useRef(null);
@@ -31,10 +57,8 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
   
   // Personnel search state
   const [personnelSearch, setPersonnelSearch] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
   const [showPersonnelDropdown, setShowPersonnelDropdown] = useState(false);
   const [selectedPersonnel, setSelectedPersonnel] = useState(null);
-  const [searchLoading, setSearchLoading] = useState(false);
 
   // Equipment search state
   const [equipmentSearch, setEquipmentSearch] = useState('');
@@ -63,45 +87,18 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
     }
   }, [editData]);
 
-  // Search personnel function
-  const searchPersonnel = async (searchTerm) => {
-    console.log('🔍 Personnel Search Debug - Starting search with term:', searchTerm);
-    
-    if (!searchTerm || searchTerm.length < 2) {
-      console.log('🔍 Personnel Search Debug - Search term too short, clearing results');
-      setSearchResults([]);
-      return;
-    }
+  // Load available equipment on component mount
+  useEffect(() => {
+    searchEquipment('');
+  }, []);
 
-    setSearchLoading(true);
-    console.log('🔍 Personnel Search Debug - Setting loading to true, making API call...');
-    
-    try {
-      console.log('🔍 Personnel Search Debug - Calling authService.searchUsers with params:', { 
-        search: searchTerm,
-        limit: 10 
-      });
-      
-      const response = await authService.searchUsers({ 
-        search: searchTerm,
-        limit: 10 
-      });
-      
-      console.log('🔍 Personnel Search Debug - API Response received:', response);
-      console.log('🔍 Personnel Search Debug - Response data:', response.data);
-      
-      setSearchResults(response.data);
-      console.log('🔍 Personnel Search Debug - Search results set:', response.data);
-    } catch (error) {
-      console.error('🔍 Personnel Search Debug - Error occurred:', error);
-      console.error('🔍 Personnel Search Debug - Error response:', error.response);
-      console.error('🔍 Personnel Search Debug - Error message:', error.message);
-      toast.error('Failed to search personnel: ' + (error.response?.data?.message || error.message));
-    } finally {
-      setSearchLoading(false);
-      console.log('🔍 Personnel Search Debug - Setting loading to false');
+  // Handle search errors
+  useEffect(() => {
+    if (searchError) {
+      console.error('Personnel search error:', searchError);
+      toast.error('Failed to search personnel: ' + (searchError.response?.data?.message || searchError.message));
     }
-  };
+  }, [searchError]);
 
   // Search equipment function
   const searchEquipment = async (searchTerm) => {
@@ -119,11 +116,6 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
       setEquipmentLoading(false);
     }
   };
-
-  // Load available equipment on component mount
-  useEffect(() => {
-    searchEquipment('');
-  }, []);
 
   // Click outside detection
   useEffect(() => {
@@ -157,9 +149,11 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
       setFormData(prev => ({ ...prev, personnel: '' }));
     }
     
-    // Debounce search
+    // Debounce search with React Query
     clearTimeout(personnelSearchTimeout.current);
-    personnelSearchTimeout.current = setTimeout(() => searchPersonnel(value), 300);
+    personnelSearchTimeout.current = setTimeout(() => {
+      setPersonnelSearchTerm(value);
+    }, 300);
   };
 
   // Handle equipment search input
@@ -185,7 +179,6 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
     setPersonnelSearch(`${personnel.firstName} ${personnel.lastName} (${personnel.role})`);
     setFormData(prev => ({ ...prev, personnel: personnel._id }));
     setShowPersonnelDropdown(false);
-    setSearchResults([]);
     
     // Clear personnel error if it exists
     if (errors.personnel) {
@@ -297,15 +290,19 @@ const AssignmentForm = ({ onClose, onSuccess, editData = null }) => {
                 onFocus={() => setShowPersonnelDropdown(true)}
                 className={errors.personnel ? 'error' : ''}
                 disabled={loading}
-                placeholder="Type to search by name, email, or rank..."
+                placeholder="Type at least 2 characters to search by name, email, or rank..."
               />
               
-              {showPersonnelDropdown && (searchResults.length > 0 || searchLoading) && (
+              {showPersonnelDropdown && (
                 <div className="personnel-dropdown" ref={personnelDropdownRef}>
                   {searchLoading ? (
                     <div className="personnel-option loading">Searching...</div>
+                  ) : personnelSearchTerm.length < 2 ? (
+                    <div className="personnel-option loading">Type at least 2 characters to search...</div>
+                  ) : safeSearchResults.length === 0 ? (
+                    <div className="personnel-option loading">No personnel found</div>
                   ) : (
-                    searchResults.map((person) => (
+                    safeSearchResults.map((person) => (
                       <div
                         key={person._id}
                         className="personnel-option"

@@ -11,7 +11,7 @@ import {
 import '../styles/Table.css';
 
 const Assignments = () => {
-  const { canUpdateAssignment, canDeleteAssignment, canCreateAssignment } = usePermissions();
+  const { canUpdateAssignment, canDeleteAssignment, canCreateAssignment, canUpdateAssignmentStatus } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -247,16 +247,22 @@ const Assignments = () => {
                       </td>
                       <td className="center-cell">{assignment.equipmentQuantity || 'N/A'}</td>
                       <td>
-                        <select
-                          className={`status-select status-${assignment.status.toLowerCase()}`}
-                          value={assignment.status}
-                          onChange={(e) => handleStatusUpdate(assignment._id || assignment.id, e.target.value)}
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Completed">Completed</option>
-                          <option value="Pending">Pending</option>
-                          <option value="Cancelled">Cancelled</option>
-                        </select>
+                        {canUpdateAssignmentStatus(assignment.assignedBy?._id || assignment.assignedBy) ? (
+                          <select
+                            className={`status-select status-${assignment.status.toLowerCase()}`}
+                            value={assignment.status}
+                            onChange={(e) => handleStatusUpdate(assignment._id || assignment.id, e.target.value)}
+                          >
+                            <option value="Active">Active</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+                        ) : (
+                          <span className={`status-badge status-${assignment.status.toLowerCase()}`}>
+                            {assignment.status}
+                          </span>
+                        )}
                       </td>
                       <td>
                         <div className="action-buttons">
