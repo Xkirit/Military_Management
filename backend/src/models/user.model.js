@@ -20,6 +20,12 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
   },
+  rank: {
+    type: String,
+    required: [true, 'Rank is required'],
+    enum: ['Private', 'Corporal', 'Sergeant', 'Lieutenant', 'Captain', 'Major', 'Colonel', 'General'],
+    default: 'Private'
+  },
   role: {
     type: String,
     required: [true, 'Role is required'],

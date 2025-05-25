@@ -1,0 +1,19 @@
+{
+  "name": "military-management-system",
+  "version": "1.0.0",
+  "description": "Military Management System with React frontend and Node.js backend",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "start": "concurrently \"npm start --prefix backend\" \"npm run build --prefix frontend\"",
+    "install": "npm install --prefix backend && npm install --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "backend": "npm run dev --prefix backend",
+    "frontend": "npm run dev --prefix frontend"
+  },
+  "keywords": ["military", "management", "react", "nodejs", "mongodb"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  }
+} 
