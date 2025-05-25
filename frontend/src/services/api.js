@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://military-management-1.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://military-management-nyce.vercel.app/api';
 
 console.log('🌐 API Config Debug - API_BASE_URL:', API_BASE_URL);
 console.log('🌐 API Config Debug - VITE_API_URL env var:', import.meta.env.VITE_API_URL);

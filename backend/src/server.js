@@ -20,9 +20,10 @@ const corsOptions = {
       'http://localhost:5174', 
       'http://localhost:5175',
       'http://localhost:3000',
-      process.env.CLIENT_URL, // Your frontend URL
-      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null, // Vercel preview URLs
-      'https://your-app-name.vercel.app' // Replace with your actual Vercel app URL
+      process.env.CLIENT_URL, 
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null, 
+      'https://military-management-frontend.vercel.app',
+      'https://your-actual-frontend-url.vercel.app' // Add your actual frontend URL here 
     ].filter(Boolean); // Remove undefined values
     
     if (allowedOrigins.indexOf(origin) !== -1) {
@@ -52,10 +53,38 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+// Connect to MongoDB with serverless-friendly options
+const connectDB = async () => {
+  if (mongoose.connections[0].readyState) {
+    return;
+  }
+  
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      bufferCommands: false,
+      bufferMaxEntries: 0,
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    console.log('Connected to MongoDB');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+  }
+};
+
+// Initialize connection
+connectDB();
+
+// Middleware to ensure DB connection
+app.use(async (req, res, next) => {
+  if (mongoose.connections[0].readyState !== 1) {
+    await connectDB();
+  }
+  next();
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth.routes'));
